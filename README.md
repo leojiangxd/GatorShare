@@ -6,5 +6,5 @@ GatorShare is a web application designed to help University of Florida students 
 ## Members:
 * Leo Jiang (Front-end)
 * Ibrahim Mohammed (Front-end)
-* Sean Regan (Backend)
-* Shayan Ahmed (Backend)
+* Sean Regan (Back-end)
+* Shayan Ahmed (Back-end)
