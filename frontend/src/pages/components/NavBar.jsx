@@ -57,7 +57,7 @@ const NavBar = () => {
               <li>
                 <a className="justify-between">
                   Notifications
-                  <span className="badge bg-primary">New</span>
+                  <span className="badge bg-primary text-xs text-primary-content border-none">New</span>
                 </a>
               </li>
               <li>

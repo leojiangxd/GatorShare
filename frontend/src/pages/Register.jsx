@@ -111,7 +111,7 @@ const Register = () => {
             Register
           </button>
 
-          <Link to="/login" className="link-primary">
+          <Link to="/login" className="link-info underline">
             Have an account? Login here!
           </Link>
         </fieldset>
