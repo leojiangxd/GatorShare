@@ -66,7 +66,7 @@ const Register = () => {
               />
             </label>
             <div className="validator-hint hidden">
-              Enter valid email address
+              Enter a valid UF email
             </div>
           </div>
 
