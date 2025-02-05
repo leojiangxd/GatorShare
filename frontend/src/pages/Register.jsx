@@ -25,10 +25,10 @@ const Register = () => {
   }, [username, email, password]);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-base-200">
       <NavBar />
       <div className="flex flex-1 items-center justify-center">
-        <fieldset className="fieldset w-xs bg-base-200 border border-base-300 p-10 rounded-box">
+        <fieldset className="fieldset w-xs bg-base-100 border border-base-300 p-10 rounded-box">
           <legend className="fieldset-legend text-2xl">
             Create an Account
           </legend>
@@ -58,7 +58,7 @@ const Register = () => {
               <Mail className="opacity-50 h-[1em]" />
               <input
                 type="email"
-                placeholder="User@ufl.edu"
+                placeholder="Email@ufl.edu"
                 required
                 pattern="^[a-zA-Z0-9._]+@ufl\.edu$"
                 value={email}
@@ -111,7 +111,7 @@ const Register = () => {
             Register
           </button>
 
-          <Link to="/login" className="link-info underline">
+          <Link to="/login" className="link link-primary">
             Have an account? Login here!
           </Link>
         </fieldset>

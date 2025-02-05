@@ -18,10 +18,10 @@ const Login = () => {
   }, [username, password]);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-base-200">
       <NavBar />
       <div className="flex flex-1 items-center justify-center">
-        <fieldset className="fieldset w-xs bg-base-200 border border-base-300 p-10 rounded-box">
+        <fieldset className="fieldset w-xs bg-base-100 border border-base-300 p-10 rounded-box">
           <legend className="fieldset-legend text-2xl">Welcome Back</legend>
 
           <div>
@@ -68,7 +68,7 @@ const Login = () => {
             Login
           </button>
 
-          <Link to="/register" className="link-info underline">
+          <Link to="/register" className="link link-primary">
             Need an account? Register here!
           </Link>
         </fieldset>
