@@ -1,11 +1,13 @@
--- DROP TABLE IF EXISTS users;
--- DROP TABLE IF EXISTS posts;
--- DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS comments;
 
 CREATE TABLE users (
     user_id INTEGER PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL
+    email TEXT UNIQUE NOT NULL,
+    salt TEXT NOT NULL,
+    hashed_password TEXT NOT NULL
 );
 
 CREATE TABLE posts (
@@ -25,5 +27,5 @@ CREATE TABLE comments (
     content TEXT,
     created_at TIMESTAMP,
     likes INTEGER,
-    DISLIEKS INTEGER
+    dislikes INTEGER
 );
