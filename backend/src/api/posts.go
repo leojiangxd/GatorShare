@@ -27,15 +27,29 @@ type Post struct {
 // 	{PostID: 2, UserID: 2, Title: "Example Post", Content: "Lorem Ipsum", Date: "2025-01-01 00:00:00", Likes: 50, Dislikes: 0},
 // }
 
-func GetPosts(c *gin.Context) {
-	fmt.Println("Getting posts...")
-	// c.IndentedJSON(http.StatusOK, example_posts)
-
+func ConnectDB() (*sql.DB, error) {
 	dbPath := filepath.Join("..", "db", "database.sqlite")
 
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Error opening database"})
+		return nil, err
+	}
+
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func GetPosts(c *gin.Context) {
+	fmt.Println("Getting posts...")
+	// c.IndentedJSON(http.StatusOK, example_posts)
+
+	db, err := ConnectDB()
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Error connecting to database"})
+		log.Println("Error connecting to database:", err)
 		return
 	}
 	defer db.Close()
