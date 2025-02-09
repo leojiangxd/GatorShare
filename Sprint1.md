@@ -18,5 +18,5 @@
   - While the UI is mostly complete, more work still needs to be done to integrate backend functionality and the current UI is subject to change.
 
 ## Demos
-- [Frontend] : https://drive.google.com/file/d/1vd5z2KagNu0IWx2A81BlvunXyC8bc0lM/view?usp=drive_link
+- [Frontend](https://drive.google.com/file/d/1vd5z2KagNu0IWx2A81BlvunXyC8bc0lM/view?usp=drive_link)
 - [Backend]
