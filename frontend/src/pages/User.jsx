@@ -170,7 +170,7 @@ const User = () => {
         </div>
 
         {/* Posts List */}
-        <div className="w-full">
+        <div className="w-full flex justify-center">
           {posts.map((post) => (
             <PostCard key={post.id} post={post} preview={true} />
           ))}
