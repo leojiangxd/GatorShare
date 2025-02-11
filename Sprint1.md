@@ -12,11 +12,18 @@
 ## Progress & Completed Issues
 - The frontend team initialized the React application and installed the necessary libraries and dependencies, including Tailwind CSS.
 - The UI for all 8 planned issues has been successfully designed.
+- The backend team initialized the sqlite database and set up a basic structure for the api in go
+- 4 api calls were fully implemented
+  - GET user
+  - GET user/:id 
+  - POST user
+  - DELETE user/:id
 
 ## Incomplete Issues
 - The frontend team prioritized defining the website’s overall look before committing to full implementation.
   - While the UI is mostly complete, more work still needs to be done to integrate backend functionality and the current UI is subject to change.
+- For backend, 
 
 ## Demos
 - [Frontend]
-- [Backend]
+- [Backend] https://youtu.be/AS4bCdQDr0s
