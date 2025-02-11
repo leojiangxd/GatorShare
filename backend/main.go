@@ -16,14 +16,13 @@ var db gorm.DB
 func ConnectDatabase() error {
 
 	var err error
-	db, err := gorm.Open(sqlite.Open("names.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("./names.db"), &gorm.Config{})
 
 	if err != nil {
 		return err
 	}
 
-	db.AutoMigrate(&models.Person{})
-	return nil
+	return db.AutoMigrate(&models.Person{})
 }
 
 func main() {
@@ -54,6 +53,7 @@ func getPersons(c *gin.Context) {
 	var persons []models.Person
 
 	result := db.Limit(10).Find(&persons)
+
 	checkErr(result.Error)
 
 	if persons == nil {
@@ -101,12 +101,29 @@ func addPerson(c *gin.Context) {
 }
 
 func updatePerson(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "updatePerson Called"})
+	id := c.Param("id")
+	var person models.Person
+	if err := db.First(&person, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(&person); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	db.Save(&person)
+	c.JSON(http.StatusOK, gin.H{"data": person})
 }
 
 func deletePerson(c *gin.Context) {
 	id := c.Param("id")
-	c.JSON(http.StatusOK, gin.H{"message": "deletePerson " + id + " Called"})
+	var person models.Person
+	if err := db.First(&person, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	db.Delete(&person)
+	c.JSON(http.StatusOK, gin.H{"message": "Person deleted successfully"})
 }
 
 func options(c *gin.Context) {
