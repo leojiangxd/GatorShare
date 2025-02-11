@@ -3,15 +3,34 @@ package main
 import (
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
 
-	"testsite.com/sr1/models"
+	"gshare.com/platform/models"
 )
 
+var db *gorm.DB
+
+func ConnectDatabase() error {
+	var err error
+	db, err = gorm.Open(sqlite.Open("local.db"), &gorm.Config{})
+	if err != nil {
+		panic("Error connecting/creating the sqlite db")
+	}
+	db.AutoMigrate(&models.Member{})
+	return err
+}
+
+func checkErr(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
-	err := models.ConnectDatabase()
+	err := ConnectDatabase()
 	checkErr(err)
 
 	r := gin.Default()
@@ -19,108 +38,113 @@ func main() {
 	//API v1
 	v1 := r.Group("/api/v1")
 	{
-		v1.GET("user", getUsers)
-		v1.GET("user/:id", getUserById)
-		v1.POST("user", addUser)
-		v1.PUT("user/:id", updateUser)
-		v1.DELETE("user/:id", deleteUser)
+		v1.GET("/", index)
+		v1.GET("member", getMembers)
+		v1.GET("member/:id", getMemberById)
+		v1.POST("member", addMember)
+		v1.PUT("member/:id", updateMember)
+		v1.DELETE("member/:id", deleteMember)
+		v1.OPTIONS("member", options)
 	}
 
 	// By default it serves on :8080 unless a
 	// PORT environment variable was defined.
 	r.Run()
+}
+
+func index(c *gin.Context) {
+
+	c.JSON(http.StatusOK, gin.H{"message": "index Called"})
 
 }
 
-func getUsers(c *gin.Context) {
+func getMembers(c *gin.Context) {
 
-	users, err := models.GetUsers(10)
-	checkErr(err)
+	var members []models.Member
 
-	if users == nil {
+	result := db.Limit(10).Find(&members)
+
+	checkErr(result.Error)
+
+	if members == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
 		return
 	} else {
-		c.JSON(http.StatusOK, gin.H{"data": users})
+		c.JSON(http.StatusOK, gin.H{"data": members})
 	}
 }
 
-func getUserById(c *gin.Context) {
+func getMemberById(c *gin.Context) {
 
 	id := c.Param("id")
 
-	user, err := models.GetUserById(id)
-	checkErr(err)
+	var member models.Member
 
-	if user.Email == "" {
+	result := db.Where("id = ?", id).First(&member)
+
+	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
 		return
 	} else {
-		c.JSON(http.StatusOK, gin.H{"data": user})
+		c.JSON(http.StatusOK, gin.H{"data": member})
 	}
 }
 
-func addUser(c *gin.Context) {
+func addMember(c *gin.Context) {
 
-	var json models.User
+	var newMember models.Member
 
-	if err := c.ShouldBindJSON(&json); err != nil {
+	if err := c.ShouldBindJSON(&newMember); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	success, err := models.AddUser(json)
+	result := db.Create(&newMember)
 
-	if success {
-		c.JSON(http.StatusOK, gin.H{"message": "Success"})
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		c.JSON(http.StatusOK, gin.H{"message": "Success"})
 	}
 }
 
-func updateUser(c *gin.Context) {
+func updateMember(c *gin.Context) {
 
-	var json models.User
+	id := c.Param("id")
 
-	if err := c.ShouldBindJSON(&json); err != nil {
+	var member models.Member
+
+	if err := db.First(&member, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+
+	if err := c.ShouldBindJSON(&member); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	userId, err := strconv.Atoi(c.Param("id"))
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-	}
-
-	success, err := models.UpdateUser(json, userId)
-
-	if success {
-		c.JSON(http.StatusOK, gin.H{"message": "Success"})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
-	}
+	db.Save(&member)
+	c.JSON(http.StatusOK, gin.H{"data": member})
 }
 
-func deleteUser(c *gin.Context) {
+func deleteMember(c *gin.Context) {
 
-	userId, err := strconv.Atoi(c.Param("id"))
+	id := c.Param("id")
 
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+	var member models.Member
+
+	if err := db.First(&member, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
 	}
 
-	success, err := models.DeleteUser(userId)
-
-	if success {
-		c.JSON(http.StatusOK, gin.H{"message": "Success"})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
-	}
+	db.Delete(&member)
+	c.JSON(http.StatusOK, gin.H{"message": "Member deleted successfully"})
 }
 
-func checkErr(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
+func options(c *gin.Context) {
+
+	c.JSON(http.StatusOK, gin.H{"message": "options Called"})
+
 }
