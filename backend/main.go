@@ -13,7 +13,7 @@ import (
 
 var db *gorm.DB
 
-func ConnectDatabase() error {
+func connectDatabase() error {
 	var err error
 	db, err = gorm.Open(sqlite.Open("local.db"), &gorm.Config{})
 	if err != nil {
@@ -30,7 +30,7 @@ func checkErr(err error) {
 }
 
 func main() {
-	err := ConnectDatabase()
+	err := connectDatabase()
 	checkErr(err)
 
 	r := gin.Default()
@@ -40,10 +40,13 @@ func main() {
 	{
 		v1.GET("/", index)
 		v1.GET("member", getMembers)
-		v1.GET("member/:id", getMemberById)
-		v1.POST("member", addMember)
-		v1.PUT("member/:id", updateMember)
-		v1.DELETE("member/:id", deleteMember)
+		//v1.GET("member/:id", getMemberById)
+		v1.GET("member/:username", getMemberByUsername)
+		v1.POST("register", register)
+		v1.PUT("member/:username", updateMember)
+		v1.DELETE("member/:username", deleteMember)
+		v1.POST("login", login)
+		v1.POST("logout", logout)
 		v1.OPTIONS("member", options)
 	}
 
@@ -90,15 +93,42 @@ func getMemberById(c *gin.Context) {
 	}
 }
 
-func addMember(c *gin.Context) {
+func getMemberByUsername(c *gin.Context) {
+
+	username := c.Param("username")
+
+	var member models.Member
+
+	result := db.Where("username = ?", username).First(&member)
+
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{"data": member})
+	}
+}
+
+func register(c *gin.Context) {
 
 	var newMember models.Member
 
+	//Check that the request is in the correct format
 	if err := c.ShouldBindJSON(&newMember); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	//Check if there is already a user with that username (could implement frontend requirements for this without using http requests)
+	if err := db.First(&newMember, newMember.Username).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username already exists"})
+		return
+	}
+
+	//Hash the password using bcrypt
+	newMember.Password, _ = hashPassword(newMember.Password)
+
+	//Add to database
 	result := db.Create(&newMember)
 
 	if result.Error != nil {
@@ -108,13 +138,21 @@ func addMember(c *gin.Context) {
 	}
 }
 
+func login(c *gin.Context) {
+
+}
+
+func logout(c *gin.Context) {
+
+}
+
 func updateMember(c *gin.Context) {
 
-	id := c.Param("id")
+	username := c.Param("username")
 
 	var member models.Member
 
-	if err := db.First(&member, id).Error; err != nil {
+	if err := db.First(&member, username).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
 		return
 	}
@@ -130,11 +168,11 @@ func updateMember(c *gin.Context) {
 
 func deleteMember(c *gin.Context) {
 
-	id := c.Param("id")
+	username := c.Param("username")
 
 	var member models.Member
 
-	if err := db.First(&member, id).Error; err != nil {
+	if err := db.First(&member, username).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
 		return
 	}
