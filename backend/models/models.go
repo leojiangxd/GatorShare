@@ -1,17 +1,16 @@
 package models
 
 import (
-	"gorm.io/gorm"
+	"time"
 )
 
 type Member struct {
-	gorm.Model
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 	MemberId     int    `json:"member_id"`
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
 	Email        string `json:"email"`
 	Username     string `json:"username"`
-	Password     string `json:"hashed_password"`
+	Password     string `json:"password"`
 	SessionToken string `json:"session_token"`
 	CSRFToken    string `json:"csrf_token"`
 }
