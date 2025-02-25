@@ -22,8 +22,11 @@
 ## Incomplete Issues
 - The frontend team prioritized defining the website’s overall look before committing to full implementation.
   - While the UI is mostly complete, more work still needs to be done to integrate backend functionality and the current UI is subject to change.
-- For backend, 
+- While some api structure was made for the user table, we didn't set aside enough time to fully develop all the planned functionality
+  - PUT user/:id was exhibiting odd behavior just before the demo and we were unable to debug in time
+  - A table for the posts as well as one for comments was discussed but not implemented
+  - API was not integrated into the frontend due to the lack of many needed calls
 
 ## Demos
-- [Frontend]
-- [Backend] https://youtu.be/AS4bCdQDr0s
+- [Frontend](https://drive.google.com/file/d/1vd5z2KagNu0IWx2A81BlvunXyC8bc0lM/view?usp=drive_link)
+- [Backend](https://youtu.be/AS4bCdQDr0s)

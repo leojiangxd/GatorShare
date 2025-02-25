@@ -58,7 +58,7 @@ const Register = () => {
               <Mail className="opacity-50 h-[1em]" />
               <input
                 type="email"
-                placeholder="Email@ufl.edu"
+                placeholder="example@ufl.edu"
                 required
                 pattern="^[a-zA-Z0-9._]+@ufl\.edu$"
                 value={email}
