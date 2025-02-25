@@ -11,9 +11,14 @@ const NavBar = () => {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && searchTerm.trim() !== "") {
-      navigate(`/search/${searchTerm}`);
+    if (e.key === "Enter") {
+      if (searchTerm.trim() !== "") {
+        navigate(`/search/${searchTerm}`);
+      } else {
+        navigate(`/`);
+      }
     }
+    
   };
 
   const handleLogout = () => {
@@ -53,7 +58,6 @@ const NavBar = () => {
               >
                 <div className="w-10 rounded-full">
                   <img
-                    alt="User Avatar"
                     src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"
                   />
                 </div>
