@@ -77,22 +77,6 @@ func getMembers(c *gin.Context) {
 	}
 }
 
-func getMemberById(c *gin.Context) {
-
-	id := c.Param("id")
-
-	var member models.Member
-
-	result := db.First(&member, "id = ?", id)
-
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
-		return
-	} else {
-		c.JSON(http.StatusOK, gin.H{"data": member})
-	}
-}
-
 func getMemberByUsername(c *gin.Context) {
 
 	username := c.Param("username")
