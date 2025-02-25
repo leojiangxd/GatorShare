@@ -40,7 +40,6 @@ func main() {
 	{
 		v1.GET("/", index)
 		v1.GET("member", getMembers)
-		//v1.GET("member/:id", getMemberById)
 		v1.GET("member/:username", getMemberByUsername)
 		v1.POST("register", register)
 		v1.PUT("member/:username", updateMember)
