@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"gshare.com/platform/models"
@@ -19,7 +20,7 @@ func connectDatabase() error {
 	if err != nil {
 		panic("Error connecting/creating the sqlite db")
 	}
-	db.AutoMigrate(&models.Member{})
+	db.AutoMigrate(&models.Member{}, &models.Post{}, &models.Comment{})
 	return err
 }
 
@@ -39,14 +40,29 @@ func main() {
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/", index)
+		
+		// user routes
 		v1.GET("member", getMembers)
 		v1.GET("member/:username", getMemberByUsername)
 		v1.POST("register", register)
-		v1.PUT("member/:username", updateMember)
-		v1.DELETE("member/:username", deleteMember)
+		v1.PUT("member", updateMember)
+		v1.DELETE("member", deleteMember)
 		v1.POST("login", login)
-		v1.POST("logout/:username", logout)
+		v1.POST("logout", logout)
 		v1.OPTIONS("member", options)
+		
+		// post routes
+		v1.GET("post", getPosts)
+		v1.GET("post/:postId", getPostById)
+		v1.POST("post", createPost)
+		v1.DELETE("post/:postId", deletePost)
+
+		// comment routes
+		v1.GET("comment/:postId/", getComments)
+		v1.GET("comment/:postId/:commentId", getCommentById)
+		v1.POST("comment/:postId", createComment)
+		v1.DELETE("comment/:postId/:commentId", deleteComment)
+
 	}
 
 	// By default it serves on :8080 unless a
@@ -115,9 +131,18 @@ func register(c *gin.Context) {
 	result := db.Create(&newMember)
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
-	} else {
-		c.JSON(http.StatusOK, gin.H{"message": "Success"})
 	}
+	
+	//Generate tokens and pass to user cookies
+	sessionToken := generateToken(32)
+	csrfToken := generateToken(32)
+
+	c.SetCookie("session_token", sessionToken, 3600, "/", "localhost", false, true)
+	c.SetCookie("csrf_token", csrfToken, 3600, "/", "localhost", false, false)
+
+	//Store tokens in the database
+	db.Model(&newMember).Where("username = ?", newMember.Username).Updates(map[string]any{"session_token": sessionToken, "csrf_token": csrfToken})
+	c.JSON(http.StatusOK, gin.H{"message": "Register successful"})
 }
 
 func login(c *gin.Context) {
@@ -165,7 +190,11 @@ func logout(c *gin.Context) {
 	c.SetCookie("session_token", "", -1, "/", "localhost", false, true)
 	c.SetCookie("csrf_token", "", -1, "/", "localhost", false, false)
 
-	username := c.Param("username")
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
 	var member models.Member
 
@@ -190,7 +219,11 @@ func updateMember(c *gin.Context) {
 		return
 	}
 
-	username := c.Param("username")
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
 	var member models.Member
 
@@ -227,7 +260,11 @@ func deleteMember(c *gin.Context) {
 		return
 	}
 
-	username := c.Param("username")
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
 	var member models.Member
 
@@ -244,4 +281,231 @@ func options(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "options Called"})
 
+}
+
+func getPosts(c *gin.Context) {
+
+	var posts []models.Post
+
+	result := db.Find(&posts)
+
+	checkErr(result.Error)
+
+	if posts == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No Posts Found"})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{"data": posts})
+	}
+}
+
+func getPostById(c *gin.Context) {
+	postId := c.Param("postId")
+	var post models.Post
+	result := db.First(&post, "post_id = ?", postId)
+
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Post not found"})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{"data": post})
+	}
+}
+
+func createPost(c *gin.Context) {
+	//Check if user is logged in
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var newPost models.Post
+
+	if err := c.ShouldBindJSON(&newPost); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if newPost.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Content is required"})
+		return
+	}
+
+	newPost.Author = username
+	newPost.Likes = 0
+	newPost.Dislikes = 0
+	newPost.Views = 0
+	newPost.PostId = uuid.New().String()
+	newPost.Comments = []models.Comment{}
+
+	result := db.Create(&newPost)
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"message": "Post created successfully", "data": newPost})
+	}
+}
+
+func deletePost(c *gin.Context) {
+
+	//Check if user is logged in
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err})
+		return
+	}
+
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// find post by id
+	postId := c.Param("postId")
+	var post models.Post
+	result := db.First(&post, "post_id = ?", postId)
+
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Post not found"})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{"data": post})
+	}
+
+	if post.Author != username {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "You can only delete your own posts"})
+		return
+	}
+
+	db.Delete(&post)
+	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
+}
+
+func getComments(c *gin.Context) {
+	postId := c.Param("postId")
+	
+	// Find the post first
+	var post models.Post
+	if err := db.First(&post, "post_id = ?", postId).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Post not found"})
+		return
+	}
+	
+	// Preload comments for the post
+	if err := db.Model(&post).Preload("Comments").First(&post, "post_id = ?", postId).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Error loading comments"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"data": post.Comments})
+}
+
+func getCommentById(c *gin.Context) {
+	postId := c.Param("postId")
+	commentId := c.Param("commentId")
+	
+	var comment models.Comment
+	result := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId)
+	
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment not found"})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{"data": comment})
+	}
+}
+
+func createComment(c *gin.Context) {
+	// Check if user is logged in
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	
+	// Get the post ID from URL parameter
+	postId := c.Param("postId")
+	
+	// Verify the post exists
+	var post models.Post
+	if err := db.First(&post, "post_id = ?", postId).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Post not found"})
+		return
+	}
+	
+	var newComment models.Comment
+	
+	// Bind the JSON request to the comment struct
+	if err := c.ShouldBindJSON(&newComment); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	// Validate comment content
+	if newComment.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment content is required"})
+		return
+	}
+	
+	// Set comment fields
+	newComment.Author = username
+	newComment.PostID = postId
+	newComment.CommentId = uuid.New().String()
+	newComment.Likes = 0
+	newComment.Dislikes = 0
+	
+	// Create the comment in the database
+	result := db.Create(&newComment)
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"message": "Comment created successfully", "data": newComment})
+	}
+}
+
+func deleteComment(c *gin.Context) {
+	// Check if user is logged in
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	
+	// Get parameters from URL
+	postId := c.Param("postId")
+	commentId := c.Param("commentId")
+	
+	// Find the comment
+	var comment models.Comment
+	result := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId)
+	
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment not found"})
+		return
+	}
+	
+	// Check if the user is the author of the comment
+	if comment.Author != username {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "You can only delete your own comments"})
+		return
+	}
+	
+	// Delete the comment
+	db.Delete(&comment)
+	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
 }
