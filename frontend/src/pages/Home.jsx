@@ -14,8 +14,8 @@ const User = () => {
       try {
         const response = await axios.get(`${apiBaseUrl}/api/v1/post`);
         setPosts(response.data.data);
-      } catch (error) {
-        console.error("Error fetching posts:", error);
+      } catch {
+        setPosts([])
       }
     };
     fetchPosts();

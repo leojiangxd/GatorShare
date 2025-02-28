@@ -89,8 +89,8 @@ const User = () => {
           (post) => post.author === id
         );
         setPosts(filteredPosts);
-      } catch (error) {
-        console.error("Error fetching posts:", error);
+      } catch {
+        setPosts([])
       }
     };
     fetchPosts();

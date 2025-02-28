@@ -1,6 +1,9 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -15,6 +18,24 @@ type Member struct {
 	CSRFToken    string `json:"csrf_token"`
 }
 
+type StringArray []string
+
+func (sa *StringArray) Scan(value interface{}) error {
+    bytes, ok := value.([]byte)
+    if !ok {
+        return errors.New("Failed to unmarshal StringArray value")
+    }
+
+    return json.Unmarshal(bytes, &sa)
+}
+
+func (sa StringArray) Value() (driver.Value, error) {
+    if sa == nil {
+        return nil, nil
+    }
+    return json.Marshal(sa)
+}
+
 type Post struct {
     PostId       string    `json:"post_id" gorm:"primaryKey"`
     CreatedAt    time.Time
@@ -25,6 +46,7 @@ type Post struct {
     Dislikes     int       `json:"dislikes"`
     Views        int       `json:"views"`
     Comments     []Comment `json:"comments" gorm:"foreignKey:PostID;references:PostId"`
+    Images       StringArray `json:"images" gorm:"type:text"`
 }
 
 type Comment struct {

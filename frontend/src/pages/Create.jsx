@@ -48,7 +48,7 @@ const Create = () => {
     try {
       await axios.post(
         `${apiBaseUrl}/api/v1/post`,
-        { title : title.trim(), content : text.trim() },
+        { title : title.trim(), content : text.trim(), images : images},
         {
           headers: {
             "X-CSRF-Token": csrfToken || "",

@@ -323,11 +323,6 @@ func getPosts(c *gin.Context) {
 		return
 	}
 
-	if len(posts) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No Posts Found"})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{"data": posts})
 }
 
@@ -348,7 +343,6 @@ func getPostById(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": post})
 }
 
-
 func createPost(c *gin.Context) {
 	//Check if user is logged in
 	if err := Authorize(c); err != nil {
@@ -368,10 +362,14 @@ func createPost(c *gin.Context) {
 		return
 	}
 
-	if newPost.Content == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Content is required"})
+	if newPost.Title == "" || newPost.Content == ""{
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
 		return
 	}
+
+	if newPost.Images == nil {
+        newPost.Images = models.StringArray{}
+    }
 
 	newPost.Author = username
 	newPost.Likes = 0

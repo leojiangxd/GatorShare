@@ -7,27 +7,32 @@ export const getCsrfToken = () => {
 };
 
 export async function getUsername() {
-	const csrfToken = getCsrfToken();
-	const response = await axios.get(`${apiBaseUrl}/api/v1/current-user`, {
-		headers: {
-			"X-CSRF-Token": csrfToken || "",
-		},
-		withCredentials: true,
-	});
-	return response.data.username;
+  try {
+    const csrfToken = getCsrfToken();
+    const response = await axios.get(`${apiBaseUrl}/api/v1/current-user`, {
+      headers: {
+        "X-CSRF-Token": csrfToken || "",
+      },
+      withCredentials: true,
+    });
+    return response.data.username;
+  } catch {
+    return "";
+  }
 }
+
 
 export const formatTime = (dateString) => {
   const date = new Date(dateString);
   const now = new Date();
   const diffInMilliseconds = now - date;
-  
+
   // Less than a minute
   if (diffInMilliseconds < 60000) {
     const seconds = Math.floor(diffInMilliseconds / 1000);
     return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
   }
-  
+
   // Less than an hour
   if (diffInMilliseconds < 3600000) {
     const minutes = Math.floor(diffInMilliseconds / 60000);
@@ -39,7 +44,7 @@ export const formatTime = (dateString) => {
     const hours = Math.floor(diffInMilliseconds / 3600000);
     return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
   }
-  
+
   // Less than a week (7 days)
   if (diffInMilliseconds < 604800000) {
     const days = Math.floor(diffInMilliseconds / 86400000);

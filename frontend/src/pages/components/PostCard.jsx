@@ -163,7 +163,7 @@ const PostCard = ({ post, preview = false }) => {
       )}
 
       {/* Image container */}
-      <div className="flex justify-center">
+      <div className={`flex justify-center ${images.length > 0 ? 'mt-5' : ''}`}>
         <div
           id="imageContainer"
           ref={imageContainerRef}
