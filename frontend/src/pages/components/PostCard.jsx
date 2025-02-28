@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, MessageSquare, Send, ThumbsDown, ThumbsUp } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { formatTime, getCsrfToken } from "../../utils/functions";
 
 const PostCard = ({ post, preview = false }) => {
   const [comment, setComment] = useState("");
   const imageContainerRef = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  const navigate = useNavigate();
 
   // Scroll horizontally using vertical scroll
   useEffect(() => {
@@ -63,13 +67,37 @@ const PostCard = ({ post, preview = false }) => {
     alert("disliked post");
   };
 
-  const handleSendComment = () => {
-    alert(`Comment: ${comment}`);
-    setComment("");
+  const handleSendComment = async () => {
+    if (comment.trim() == "")
+      return;
+    const csrfToken = getCsrfToken();
+    
+    if (!csrfToken) {
+      console.error("CSRF token is missing.");
+      navigate("/login");
+      return;
+    }
+  
+    try {
+      console.log(comment)
+      await axios.post(
+        `${apiBaseUrl}/api/v1/comment/${post.post_id}`,
+        { content : comment.trim() },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+      window.location.reload()
+    } catch (error) {
+      console.error("Error sending comment:", error.response ? error.response.data : error.message);
+    }
   };
-
-  const incrementViewCount = () => {
-    console.log(`Views: ${post.views + 1}`);
+  
+  const incrementViewCount = async () => {
+    await axios.put(`${apiBaseUrl}/api/v1/post/${post.post_id}/increment-views`)
   };
 
   const handleImageClick = (e, image) => {
@@ -97,11 +125,12 @@ const PostCard = ({ post, preview = false }) => {
           <Link to={`/user/${post.author}`} className="hover:underline">
             {post.author}
           </Link>
-          <span className="opacity-50 ml-1">{post.date}</span>
+          <span className="opacity-50 ml-1">{formatTime(post.CreatedAt)}</span>
         </div>
         <div className="card-actions flex items-center pt-2">
           <div className="badge badge-ghost flex text-xs">
-            <MessageSquare className="w-[1em]" /> {post.comments.length}
+            <MessageSquare className="w-[1em]" />{" "}
+            {post.comments ? post.comments.length : 0}
           </div>
           <div className="badge badge-ghost flex text-xs">
             <Eye className="w-[1em]" /> {post.views}
@@ -154,7 +183,7 @@ const PostCard = ({ post, preview = false }) => {
       </div>
 
       {!preview && (
-        <div className="flex justify-center items-center w-auto mt-5">
+        <div className="flex justify-center items-center w-auto">
           <input
             type="text"
             placeholder="Comment"
@@ -179,7 +208,7 @@ const PostCard = ({ post, preview = false }) => {
         {preview ? (
           <Link
             className="card-body"
-            to={`/post/${post.id}`}
+            to={`/post/${post.post_id}`}
             onClick={incrementViewCount}
           >
             {cardContent}

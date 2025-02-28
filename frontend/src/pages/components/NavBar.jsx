@@ -1,10 +1,43 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getCsrfToken, getUsername } from "../../utils/functions";
 
 const NavBar = () => {
-  const isLoggedIn = true;
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loggedInUsername, setLoggedInUsername] = useState("");
+  useEffect(() => {
+    const fetchUsername = async () => {
+      const username = await getUsername();
+      setLoggedInUsername(username || "");
+    };
+
+    fetchUsername();
+  }, []);
   const navigate = useNavigate();
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  useEffect(() => {
+    const checkUserLogin = async () => {
+      try {
+        const csrfToken = getCsrfToken();
+        const response = await axios.get(`${apiBaseUrl}/api/v1/current-user`, {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        });
+
+        if (response.data.username) {
+          setIsLoggedIn(true);
+        }
+      } catch (error) {
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkUserLogin();
+  }, []);
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -18,11 +51,27 @@ const NavBar = () => {
         navigate(`/`);
       }
     }
-    
   };
 
-  const handleLogout = () => {
-    alert("Logged out!");
+  const handleLogout = async () => {
+    const csrfToken = getCsrfToken();
+    axios
+      .post(
+        `${apiBaseUrl}/api/v1/logout`,
+        {},
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      )
+      .then(() => {
+        setIsLoggedIn(false);
+      })
+      .catch((error) => {
+        console.alert("Logout failed:", error);
+      });
   };
 
   return (
@@ -44,23 +93,19 @@ const NavBar = () => {
         />
       </div>
 
-      <div className="flex flex-2 justify-end">
+      <div className="flex flex-2 justify-end items-center">
         {isLoggedIn ? (
           <div className="flex gap-2">
-          <Link to="/create" className="btn btn-ghost text-l">
-            Create
-          </Link>
+            <Link to="/create" className="btn btn-ghost text-l">
+              Create
+            </Link>
             <div className="dropdown dropdown-end">
               <div
                 tabIndex={0}
                 role="button"
-                className="btn btn-ghost btn-circle avatar"
+                className="btn btn-primary btn-circle avatar bg-primary text-xl"
               >
-                <div className="w-10 rounded-full">
-                  <img
-                    src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"
-                  />
-                </div>
+                {loggedInUsername.trim().charAt(0).toUpperCase()}
               </div>
               <ul
                 tabIndex={0}
@@ -75,7 +120,7 @@ const NavBar = () => {
                   </Link>
                 </li>
                 <li>
-                  <Link to="/user/User1">Profile</Link>
+                  <Link to={`/user/${loggedInUsername}`}>Profile</Link>
                 </li>
                 <li>
                   <Link onClick={handleLogout}>Logout</Link>

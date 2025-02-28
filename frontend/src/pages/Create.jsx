@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import NavBar from "./components/NavBar";
 import { Paperclip } from "lucide-react";
+import { getCsrfToken } from "../utils/functions";
+import { useNavigate } from "react-router-dom";
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
 const Create = () => {
   const [title, setTitle] = useState("");
@@ -8,6 +12,8 @@ const Create = () => {
   const [images, setImages] = useState([]);
   const imageContainerRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const navigate = useNavigate();
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -28,8 +34,32 @@ const Create = () => {
     setImages((images) => images.filter((_, i) => i !== index));
   };
 
-  const handleCreatePost = () => {
-    alert(`Title:\n${title}\n\nText:\n${text}`);
+  const handleCreatePost = async () => {
+    if (title.trim() == "" || text.trim() == "")
+      return
+    const csrfToken = getCsrfToken();
+    
+    if (!csrfToken) {
+      console.error("CSRF token is missing.");
+      navigate("/login");
+      return;
+    }
+  
+    try {
+      await axios.post(
+        `${apiBaseUrl}/api/v1/post`,
+        { title : title.trim(), content : text.trim() },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+      navigate("/")
+    } catch (error) {
+      console.error("Error creating post:", error.response ? error.response.data : error.message);
+    }
   };
 
   useEffect(() => {

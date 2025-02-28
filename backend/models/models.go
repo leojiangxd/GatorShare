@@ -10,6 +10,7 @@ type Member struct {
 	Email        string `json:"email"`
 	Username     string `json:"username" gorm:"primaryKey"`		
 	Password     string `json:"password"`
+	Bio          string `json:"bio"`
 	SessionToken string `json:"session_token"`
 	CSRFToken    string `json:"csrf_token"`
 }

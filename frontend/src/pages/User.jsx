@@ -1,11 +1,22 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import PostCard from "./components/PostCard";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { getCsrfToken, getUsername } from "../utils/functions";
 
 const User = () => {
-  const loggedInUsername = "test";
+  const [loggedInUsername, setLoggedInUsername] = useState("");
+  useEffect(() => {
+    const fetchUsername = async () => {
+      const username = await getUsername();
+      setLoggedInUsername(username || "");
+    };
+
+    fetchUsername();
+  }, []);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
   const { id } = useParams();
   const ownProfile =
     id.toLowerCase().trim() == loggedInUsername.toLowerCase().trim();
@@ -47,56 +58,43 @@ const User = () => {
     alert("Profile deleted!");
   };
 
-  const handleLogout = () => {
-    alert("Logged out!");
+  const handleLogout = async () => {
+    const csrfToken = getCsrfToken();
+    axios
+      .post(
+        `${apiBaseUrl}/api/v1/logout`,
+        {},
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      )
+      .then(() => {
+        location.reload();
+      })
+      .catch((error) => {
+        console.alert("Logout failed:", error);
+      });
   };
 
-  // Dummy posts (replace or fetch as needed)
-  const posts = [
-    {
-      id: 4,
-      title: "Post Title",
-      author: "Author",
-      date: "2/4/25",
-      content: "Lorem ipsum dolor sit amet consectetur, adipisicing elit...",
-      likes: 5125,
-      dislikes: 5125,
-      views: 10521,
-      comments: [
-        {
-          id: 5,
-          author: "User1",
-          date: "2/4/25",
-          content: "Nice post!",
-          likes: 10,
-          dislikes: 10,
-        },
-        // ...other comments
-      ],
-    },
-    {
-      id: 10,
-      title: "Post Title",
-      author: "Author",
-      date: "2/4/25",
-      content: "Lorem ipsum dolor sit amet consectetur, adipisicing elit...",
-      likes: 5125,
-      dislikes: 5125,
-      views: 10521,
-      comments: [
-        {
-          id: 6,
-          author: "User1",
-          date: "2/4/25",
-          content: "Nice post!",
-          likes: 10,
-          dislikes: 10,
-        },
-        // ...other comments
-      ],
-    },
-    // ...more posts
-  ];
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await axios.get(`${apiBaseUrl}/api/v1/post`);
+        const filteredPosts = response.data.data.filter(
+          (post) => post.author === id
+        );
+        setPosts(filteredPosts);
+      } catch (error) {
+        console.error("Error fetching posts:", error);
+      }
+    };
+    fetchPosts();
+  }, []);
   const { totalLikes, totalDislikes } = calcLikesAndDislikes(posts);
 
   return (
@@ -109,12 +107,8 @@ const User = () => {
             {/* Card Header: Avatar, Name, Email, and Edit Button */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="avatar mr-4">
-                  <div className="w-16 rounded-full">
-                    <img
-                      src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"
-                    />
-                  </div>
+                <div className="avatar w-16 h-16 rounded-full flex justify-center items-center bg-primary text-3xl mr-4">
+                  {id.trim().charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <h2 className="card-title">{id}</h2>
@@ -235,9 +229,13 @@ const User = () => {
         </div>
         {/* Posts List */}
         <div className="w-full flex flex-col justify-center items-center">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} preview={true} />
-          ))}
+          {posts.length > 0 ? (
+            posts.map((post) => (
+              <PostCard key={post.post_id} post={post} preview={true} />
+            ))
+          ) : (
+            <p className="text-lg text-gray-500">No posts found</p>
+          )}
         </div>
       </div>
     </div>

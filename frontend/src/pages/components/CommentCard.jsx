@@ -1,5 +1,6 @@
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { Link } from "react-router-dom";
+import { formatTime } from "../../utils/functions";
 
 const CommentCard = ({ comment }) => {
   const handleLike = (e) => {
@@ -20,7 +21,7 @@ const CommentCard = ({ comment }) => {
               <Link to={`/user/${comment.author}`} className="hover:underline">
                 {comment.author}
               </Link>
-              <span className="opacity-50 ml-1">{comment.date}</span>
+              <span className="opacity-50 ml-1">{formatTime(comment.CreatedAt)}</span>
             </div>
             <div className="flex gap-2">
               <button
