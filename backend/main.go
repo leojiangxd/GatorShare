@@ -20,6 +20,7 @@ func connectDatabase() error {
 		panic("Error connecting/creating the sqlite db")
 	}
 	db.AutoMigrate(&models.Member{})
+	db.AutoMigrate(&models.Post{})
 	return err
 }
 
@@ -47,6 +48,11 @@ func main() {
 		v1.POST("login", login)
 		v1.POST("logout/:username", logout)
 		v1.OPTIONS("member", options)
+
+		v1.POST("/:username/post", createPost)
+		v1.PUT("/:username/post/:id", updatePost)
+		v1.DELETE("/:username/post/:id", deletePost)
+		v1.GET("/:username/posts", getUserPosts)
 	}
 
 	// By default it serves on :8080 unless a
@@ -244,4 +250,94 @@ func options(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "options Called"})
 
+}
+
+func createPost(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var post models.Post
+	if err := c.ShouldBindJSON(&post); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Retrieve the username from the context
+	post.Username = c.GetString("username")
+	result := db.Create(&post)
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Post created successfully", "data": post})
+}
+
+func updatePost(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var post models.Post
+	if err := db.First(&post, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		return
+	}
+
+	// Check if the post belongs to the logged-in user
+	if post.Username != c.GetString("username") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own posts"})
+		return
+	}
+
+	if err := c.ShouldBindJSON(&post); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db.Save(&post)
+	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
+}
+
+func deletePost(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var post models.Post
+	if err := db.First(&post, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		return
+	}
+
+	// Check if the post belongs to the logged-in user
+	if post.Username != c.GetString("username") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own posts"})
+		return
+	}
+
+	db.Delete(&post)
+	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
+}
+
+func getUserPosts(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	username := c.Param("username")
+
+	var posts []models.Post
+	result := db.Where("username = ?", username).Find(&posts)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": posts})
 }
