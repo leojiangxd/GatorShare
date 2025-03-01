@@ -85,10 +85,7 @@ const User = () => {
     const fetchPosts = async () => {
       try {
         const response = await axios.get(`${apiBaseUrl}/api/v1/post`);
-        const filteredPosts = response.data.data.filter(
-          (post) => post.author === id
-        );
-        setPosts(filteredPosts);
+        setPosts(response.data.data);
       } catch {
         setPosts([])
       }
