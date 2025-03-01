@@ -1,0 +1,175 @@
+basePath: /api/v1
+definitions:
+  models.Member:
+    properties:
+      CreatedAt:
+        type: string
+      UpdatedAt:
+        type: string
+      bio:
+        type: string
+      csrf_token:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+      session_token:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Backend API for the GatorShare app
+  title: GatorShare API
+  version: "1.0"
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: login user
+      parameters:
+      - description: Member username and password
+        in: body
+        name: member
+        required: true
+        schema:
+          $ref: '#/definitions/models.Member'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Logs in an existing user
+      tags:
+      - member
+  /logout:
+    post:
+      consumes:
+      - application/json
+      description: logout user
+      parameters:
+      - description: Member username
+        in: body
+        name: member
+        required: true
+        schema:
+          $ref: '#/definitions/models.Member'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Logs out a currently logged in user
+      tags:
+      - member
+  /member:
+    delete:
+      consumes:
+      - application/json
+      description: delete user
+      parameters:
+      - description: Member username
+        in: body
+        name: member
+        required: true
+        schema:
+          $ref: '#/definitions/models.Member'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Deletes a member from the system
+      tags:
+      - member
+    get:
+      consumes:
+      - application/json
+      description: get members
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Member'
+            type: array
+      summary: Lists the first 10 members
+      tags:
+      - member
+    put:
+      consumes:
+      - application/json
+      description: update user
+      parameters:
+      - description: Updated member info
+        in: body
+        name: member
+        required: true
+        schema:
+          $ref: '#/definitions/models.Member'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Updates a members information
+      tags:
+      - member
+  /member/{username}:
+    get:
+      consumes:
+      - application/json
+      description: get member by username
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Member'
+      summary: Gets a member's info by their username
+      tags:
+      - member
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: resgister user
+      parameters:
+      - description: New member
+        in: body
+        name: member
+        required: true
+        schema:
+          $ref: '#/definitions/models.Member'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Registers a new user
+      tags:
+      - member
+swagger: "2.0"

@@ -10,8 +10,19 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	swaggerFiles "github.com/swaggo/files"     // swagger embed files
+	ginSwagger "github.com/swaggo/gin-swagger" // gin-swagger middleware
 	"gshare.com/platform/models"
+
+	"gshare.com/platform/docs"
 )
+
+//	@title			GatorShare API
+//	@version		1.0
+//	@description	Backend API for the GatorShare app
+
+//	@host		localhost:8080
+//	@BasePath	/api/v1
 
 var db *gorm.DB
 
@@ -32,6 +43,9 @@ func checkErr(err error) {
 }
 
 func main() {
+
+	docs.SwaggerInfo.Title = "GatorShare API"
+
 	err := connectDatabase()
 	checkErr(err)
 
@@ -49,7 +63,7 @@ func main() {
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/", index)
-		
+
 		// user routes
 		v1.GET("member", getMembers)
 		v1.GET("member/:username", getMemberByUsername)
@@ -61,7 +75,7 @@ func main() {
 		v1.OPTIONS("member", options)
 
 		v1.GET("current-user", getCurrentUser)
-		
+
 		// post routes
 		v1.GET("post", getPosts)
 		v1.GET("post/:postId", getPostById)
@@ -79,6 +93,9 @@ func main() {
 
 	}
 
+	// use ginSwagger middleware to serve the API docs
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// By default it serves on :8080 unless a
 	// PORT environment variable was defined.
 	r.Run()
@@ -90,6 +107,15 @@ func index(c *gin.Context) {
 
 }
 
+// GetMembers godoc
+//
+//	@Summary		Lists the first 10 members
+//	@Description	get members
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{array}	models.Member
+//	@Router			/member [get]
 func getMembers(c *gin.Context) {
 
 	var members []models.Member
@@ -106,6 +132,16 @@ func getMembers(c *gin.Context) {
 	}
 }
 
+// GetMemberByUsername godoc
+//
+//	@Summary		Gets a member's info by their username
+//	@Description	get member by username
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			username	path		string	true	"Username"
+//	@Success		200			{object}	models.Member
+//	@Router			/member/{username} [get]
 func getMemberByUsername(c *gin.Context) {
 
 	username := c.Param("username")
@@ -122,6 +158,16 @@ func getMemberByUsername(c *gin.Context) {
 	}
 }
 
+// Register godoc
+//
+//	@Summary		Registers a new user
+//	@Description	resgister user
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"New member"
+//	@Success		200		{object}	string
+//	@Router			/register [post]
 func register(c *gin.Context) {
 
 	var newMember models.Member
@@ -146,7 +192,7 @@ func register(c *gin.Context) {
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
 	}
-	
+
 	//Generate tokens and pass to user cookies
 	sessionToken := generateToken(32)
 	csrfToken := generateToken(32)
@@ -156,9 +202,19 @@ func register(c *gin.Context) {
 
 	//Store tokens in the database
 	db.Model(&newMember).Where("username = ?", newMember.Username).Updates(map[string]any{"session_token": sessionToken, "csrf_token": csrfToken})
-	c.JSON(http.StatusOK, gin.H{"message": "Register successful"})
+	c.JSON(http.StatusCreated, gin.H{"message": "Successfully registered user: " + newMember.Username})
 }
 
+// Login godoc
+//
+//	@Summary		Logs in an existing user
+//	@Description	login user
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"Member username and password"
+//	@Success		200		{object}	string
+//	@Router			/login [post]
 func login(c *gin.Context) {
 
 	var loginInfo models.Member
@@ -192,6 +248,16 @@ func login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
 }
 
+// Logout godoc
+//
+//	@Summary		Logs out a currently logged in user
+//	@Description	logout user
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"Member username"
+//	@Success		200		{object}	string
+//	@Router			/logout [post]
 func logout(c *gin.Context) {
 
 	//Check if user is logged in
@@ -225,6 +291,16 @@ func logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
 
+// UpdateMember godoc
+//
+//	@Summary		Updates a members information
+//	@Description	update user
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"Updated member info"
+//	@Success		200		{object}	string
+//	@Router			/member [put]
 func updateMember(c *gin.Context) {
 
 	//Check if user is logged in
@@ -262,10 +338,20 @@ func updateMember(c *gin.Context) {
 		}
 	}
 
-	db.Model(&member).Where("username = ?", username).Updates(models.Member{Email: member.Email, Username: member.Username, Password: member.Password})
+	db.Model(&member).Where("username = ?", username).Updates(models.Member{Email: member.Email, Username: member.Username, Password: member.Password, Bio: member.Bio})
 	c.JSON(http.StatusOK, gin.H{"data": member})
 }
 
+// DeleteMember godoc
+//
+//	@Summary		Deletes a member from the system
+//	@Description	delete user
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"Member username"
+//	@Success		200		{object}	string
+//	@Router			/member [delete]
 func deleteMember(c *gin.Context) {
 
 	//Check if user is logged in
@@ -303,13 +389,13 @@ func getCurrentUser(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	username := getUsername(c)
 	if username == "" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized 2"})
 		return
 	}
-	
+
 	// Return the username
 	c.JSON(http.StatusOK, gin.H{"username": username})
 }
@@ -345,7 +431,6 @@ func getPostById(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": post})
 }
 
-
 func createPost(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -362,14 +447,14 @@ func createPost(c *gin.Context) {
 	username := getUsername(c)
 	post.Author = username
 
-	if post.Title == "" || post.Content == ""{
+	if post.Title == "" || post.Content == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
 		return
 	}
 
 	if post.Images == nil {
-        post.Images = models.StringArray{}
-    }
+		post.Images = models.StringArray{}
+	}
 	post.PostId = uuid.New().String()
 	post.Comments = []models.Comment{}
 
@@ -472,7 +557,7 @@ func incrementPostViews(c *gin.Context) {
 
 func getComments(c *gin.Context) {
 	postId := c.Param("postId")
-	
+
 	// Find the post first
 	var post models.Post
 	if err := db.First(&post, "post_id = ?", postId).Error; err != nil {
@@ -495,10 +580,10 @@ func getComments(c *gin.Context) {
 func getCommentById(c *gin.Context) {
 	postId := c.Param("postId")
 	commentId := c.Param("commentId")
-	
+
 	var comment models.Comment
 	result := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId)
-	
+
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment not found"})
 		return
@@ -513,44 +598,44 @@ func createComment(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	username := getUsername(c)
 	if username == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	// Get the post ID from URL parameter
 	postId := c.Param("postId")
-	
+
 	// Verify the post exists
 	var post models.Post
 	if err := db.First(&post, "post_id = ?", postId).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Post not found"})
 		return
 	}
-	
+
 	var newComment models.Comment
-	
+
 	// Bind the JSON request to the comment struct
 	if err := c.ShouldBindJSON(&newComment); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	// Validate comment content
 	if newComment.Content == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment content is required"})
 		return
 	}
-	
+
 	// Set comment fields
 	newComment.Author = username
 	newComment.PostID = postId
 	newComment.CommentId = uuid.New().String()
 	newComment.Likes = 0
 	newComment.Dislikes = 0
-	
+
 	// Create the comment in the database
 	result := db.Create(&newComment)
 	if result.Error != nil {
@@ -566,32 +651,32 @@ func deleteComment(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	username := getUsername(c)
 	if username == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	// Get parameters from URL
 	postId := c.Param("postId")
 	commentId := c.Param("commentId")
-	
+
 	// Find the comment
 	var comment models.Comment
 	result := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId)
-	
+
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment not found"})
 		return
 	}
-	
+
 	// Check if the user is the author of the comment
 	if comment.Author != username {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "You can only delete your own comments"})
 		return
 	}
-	
+
 	// Delete the comment
 	db.Delete(&comment)
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
