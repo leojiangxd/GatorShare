@@ -84,7 +84,7 @@ const User = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await axios.get(`${apiBaseUrl}/api/v1/post`);
+        const response = await axios.get(`${apiBaseUrl}/api/v1/member/${id}/posts`);
         setPosts(response.data.data);
       } catch {
         setPosts([])
