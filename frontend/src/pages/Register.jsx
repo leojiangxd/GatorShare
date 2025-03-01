@@ -1,17 +1,32 @@
 import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import NavBar from "./components/NavBar";
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Register = () => {
+  const navigate = useNavigate();
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isFormValid, setIsFormValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  const handleRegister = () => {
-    alert(`Username: ${username}\nEmail: ${email}\nPassword: ${password}`);
+  
+  const handleRegister = async () => {
+    const data = {
+      username: username.toLowerCase().trim(),
+      email: email.toLowerCase().trim(),
+      password: password,
+    };
+    
+    await axios.post(`${apiBaseUrl}/api/v1/register`, data)
+      .then(() => {
+        navigate(`/`);
+      })
+      .catch(error => {
+        alert(`Registration failed: ${JSON.stringify(error.response.data.error)}`);
+      });
   };
 
   useEffect(() => {

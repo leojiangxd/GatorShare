@@ -9,8 +9,8 @@ import (
 )
 
 func Authorize(c *gin.Context) error {
-	username := c.Param("username")
-	log.Println("Authorize: username =", username)
+
+	username := getUsername(c)
 
 	// Get the user
 	var member models.Member
@@ -49,4 +49,18 @@ func Authorize(c *gin.Context) error {
 	c.Set("username", member.Username)
 	log.Println("Authorize: user authorized successfully")
 	return nil
+}
+
+func getUsername(c *gin.Context) string {
+	st, err := c.Cookie("session_token")
+	if err != nil || st == "" {
+		return ""
+	}
+
+	var member models.Member
+	if db.First(&member, "session_token = ?", st).Error != nil {
+		return ""
+	}
+
+	return member.Username
 }

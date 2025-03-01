@@ -1,16 +1,30 @@
 import { Eye, EyeOff, Lock, User } from "lucide-react";
 import NavBar from "./components/NavBar";
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Login = () => {
+  const navigate = useNavigate();
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isFormValid, setIsFormValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = () => {
-    alert(`Username: ${username}\nPassword: ${password}`);
+  const handleLogin = async () => {
+    const data = {
+      username: username.toLowerCase().trim(),
+      password: password,
+    };
+    
+    await axios.post(`${apiBaseUrl}/api/v1/login`, data)
+      .then(() => {
+        navigate(`/`);
+      })
+      .catch(error => {
+        alert(`Login failed: ${JSON.stringify(error.response.data.error)}`);
+      });
   };
 
   useEffect(() => {
