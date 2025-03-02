@@ -8,14 +8,14 @@ import (
 )
 
 type Member struct {
-	CreatedAt    time.Time `json:"CreatedAt"`
-	UpdatedAt    time.Time `json:"UpdatedAt"`
-	Email        string    `json:"email"`
-	Username     string    `json:"username" gorm:"primaryKey"`
-	Password     string    `json:"password"`
-	Bio          string    `json:"bio"`
-	SessionToken string    `json:"session_token"`
-	CSRFToken    string    `json:"csrf_token"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Email        string `json:"email"`
+	Username     string `json:"username" gorm:"primaryKey"`
+	Password     string `json:"password"`
+	Bio          string `json:"bio"`
+	SessionToken string `json:"session_token"`
+	CSRFToken    string `json:"csrf_token"`
 }
 
 type StringArray []string

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -100,7 +101,7 @@ func TestGetByUsername(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	user := &models.Member{}
+	var user models.Member
 	mockUser := models.Member{
 		Email:    "bettercallsaul@test.com",
 		Username: "saul",
@@ -108,8 +109,13 @@ func TestGetByUsername(t *testing.T) {
 		Bio:      "Test Bio",
 	}
 
-	log.Println(w.Body.Bytes())
-	json.Unmarshal(w.Body.Bytes(), &user)
+	response := w.Body.String()[8 : len(w.Body.String())-1]
+	json.Unmarshal([]byte(response), &user)
+
+	log.Printf("session_token: %s, csrf_token: %s", user.SessionToken, user.CSRFToken)
+
+	testSessionToken = user.SessionToken
+	testCSRFToken = user.CSRFToken
 
 	assert.Equal(t, mockUser.Email, user.Email)
 	assert.Equal(t, mockUser.Username, user.Username)
@@ -134,6 +140,7 @@ func TestDeleteUser(t *testing.T) {
 		Value:    testSessionToken,
 		Path:     "/",
 		Domain:   "localhost",
+		Expires:  time.Now().Add(time.Hour),
 		Secure:   false,
 		HttpOnly: true,
 	})

@@ -34,8 +34,8 @@ func Authorize(c *gin.Context) error {
 	}
 
 	// Check the CSRF token from the headers
-	csrf, err := c.Cookie("csrf_token")
-	if err != nil || csrf != member.CSRFToken || csrf == "" {
+	csrf := c.Request.Header.Get("X-CSRF-Token")
+	if csrf != member.CSRFToken || csrf == "" {
 		log.Println("Authorize error: Invalid csrf token")
 		return errors.New("Invalid csrf token")
 	}
