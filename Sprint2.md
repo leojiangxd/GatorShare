@@ -26,10 +26,15 @@ Incomplete:
 Inprogress:
 - Unit tests
 - Swagger Documentation
+
 ## Unit Tests
 - List unit tests for frontend
 - List unit tests for backend
+
 ## Documentation
 - In the backend, install Swagger using `go install github.com/swaggo/swag/cmd/swag@latest`
 - Then build the backend application using `go build` and run `platform.exe`
 - Once the backend application is running, the documentation can be found at: http://localhost:8080/swagger/index.html#/member
+
+## Demos
+- [Integrated Application Demo](https://youtu.be/WVI0q96o_bc?si=bK06mV_s4whQu8LY)
