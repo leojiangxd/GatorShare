@@ -4,6 +4,7 @@ import NavBar from "./components/NavBar";
 import PostCard from "./components/PostCard";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { getCsrfToken, getUsername } from "../utils/functions";
+import axios from "axios";
 
 const User = () => {
   const [loggedInUsername, setLoggedInUsername] = useState("");
@@ -18,14 +19,16 @@ const User = () => {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
   const { id } = useParams();
+  // Use a safeId to guard against undefined id values.
+  const safeId = id || "";
   const ownProfile =
-    id.toLowerCase().trim() == loggedInUsername.toLowerCase().trim();
+    safeId.toLowerCase().trim() === loggedInUsername.toLowerCase().trim();
 
   // Toggle between view and edit modes.
   const [isEditing, setIsEditing] = useState(false);
 
   // Profile state.
-  const [username, setUsername] = useState(id);
+  const [username, setUsername] = useState(safeId);
   const [email, setEmail] = useState("example@example.com");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -84,14 +87,16 @@ const User = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await axios.get(`${apiBaseUrl}/api/v1/member/${id}/posts`);
+        const response = await axios.get(
+          `${apiBaseUrl}/api/v1/member/${safeId}/posts`
+        );
         setPosts(response.data.data);
       } catch {
-        setPosts([])
+        setPosts([]);
       }
     };
     fetchPosts();
-  }, []);
+  }, [apiBaseUrl, safeId]);
   const { totalLikes, totalDislikes } = calcLikesAndDislikes(posts);
 
   return (
@@ -105,10 +110,10 @@ const User = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="avatar w-16 h-16 rounded-full flex justify-center items-center bg-primary text-3xl mr-4">
-                  {id.trim().charAt(0).toUpperCase()}
+                  {safeId.trim().charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h2 className="card-title">{id}</h2>
+                  <h2 className="card-title">{safeId}</h2>
                   <p className="flex gap-2">
                     <div className="badge badge-primary text-xs">
                       <ThumbsUp className="w-[1em]" /> {totalLikes}
@@ -218,7 +223,7 @@ const User = () => {
                 </button>
               )
             ) : (
-              <Link to={`/message/${id}`} className="btn btn-primary btn-sm">
+              <Link to={`/message/${safeId}`} className="btn btn-primary btn-sm">
                 Message
               </Link>
             )}

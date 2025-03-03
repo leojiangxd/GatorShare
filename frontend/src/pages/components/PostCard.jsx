@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Eye, MessageSquare, Send, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { formatTime, getCsrfToken } from "../../utils/functions";
+import axios from 'axios';
+
 
 const PostCard = ({ post, preview = false }) => {
   const [comment, setComment] = useState("");
