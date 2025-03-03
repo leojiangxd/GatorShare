@@ -4,12 +4,12 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"time"
+
+	"gorm.io/gorm"
 )
 
 type Member struct {
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	gorm.Model
 	Email        string `json:"email"`
 	Username     string `json:"username" gorm:"primaryKey"`
 	Password     string `json:"password"`
@@ -37,22 +37,22 @@ func (sa StringArray) Value() (driver.Value, error) {
 }
 
 type Post struct {
-	PostId    string `json:"post_id" gorm:"primaryKey"`
-	CreatedAt time.Time
-	Author    string      `json:"author"`
-	Title     string      `json:"title"`
-	Content   string      `json:"content"`
-	Likes     int         `json:"likes"`
-	Dislikes  int         `json:"dislikes"`
-	Views     int         `json:"views"`
-	Comments  []Comment   `json:"comments" gorm:"foreignKey:PostID;references:PostId"`
-	Images    StringArray `json:"images" gorm:"type:text"`
+	gorm.Model
+	PostId   string      `json:"post_id" gorm:"primaryKey"`
+	Author   string      `json:"author"`
+	Title    string      `json:"title"`
+	Content  string      `json:"content"`
+	Likes    int         `json:"likes"`
+	Dislikes int         `json:"dislikes"`
+	Views    int         `json:"views"`
+	Comments []Comment   `json:"comments" gorm:"foreignKey:PostID;references:PostId"`
+	Images   StringArray `json:"images" gorm:"type:text"`
 }
 
 type Comment struct {
+	gorm.Model
 	CommentId string `json:"comment_id" gorm:"primaryKey"`
 	PostID    string `json:"post_id" gorm:"index"`
-	CreatedAt time.Time
 	Author    string `json:"author"`
 	Content   string `json:"content"`
 	Likes     int    `json:"likes"`
