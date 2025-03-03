@@ -283,8 +283,6 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "Backend API for the GatorShare app",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
-	LeftDelim:        "{{",
-	RightDelim:       "}}",
 }
 
 func init() {
