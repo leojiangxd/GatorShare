@@ -514,7 +514,7 @@ func updatePost(c *gin.Context) {
 		return
 	}
 
-	db.Save(&post)
+	db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{Title: post.Title, Content: post.Content})
 	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
 }
 

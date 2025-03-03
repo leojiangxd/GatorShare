@@ -270,7 +270,7 @@ func TestGetCurrentUser(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestDeleteUser(t *testing.T) {
+func TestDeleteMember(t *testing.T) {
 	err := connectDatabase()
 	checkErr(err)
 	r := SetUpRouter()
@@ -299,4 +299,247 @@ func TestDeleteUser(t *testing.T) {
 	responseData, _ := io.ReadAll(w.Body)
 	assert.Equal(t, mockResponse, string(responseData))
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestCreatePost(t *testing.T) {
+	TestRegister(t)
+	TestLogin(t)
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	newPost := models.Post{
+		Title:   "Saul's create post",
+		Content: "To test createPost's functionality",
+	}
+
+	jsonValue, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonValue))
+
+	req.AddCookie(&http.Cookie{
+		Name:  "session_token",
+		Value: testSessionToken,
+	})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Post created successfully")
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	createdPost := response["data"].(map[string]interface{})
+	assert.NotEmpty(t, createdPost["post_id"])
+}
+
+func TestGetPosts(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	req, _ := http.NewRequest("GET", "/api/v1/post", nil)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	posts := response["data"].([]interface{})
+	assert.NotEmpty(t, posts)
+}
+
+func TestGetPostById(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Creating a new post
+	newPost := models.Post{
+		Title:   "Saul's get post",
+		Content: "To test getPostById functionality",
+	}
+	jsonValue, _ := json.Marshal(newPost)
+
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonValue))
+	req.AddCookie(&http.Cookie{
+		Name:  "session_token",
+		Value: testSessionToken,
+	})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Extracting post ID from the response
+	var createResponse map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &createResponse)
+	postID := createResponse["data"].(map[string]interface{})["post_id"].(string)
+
+	req, _ = http.NewRequest("GET", "/api/v1/post/"+postID, nil)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	post := response["data"].(map[string]interface{})
+	assert.Equal(t, postID, post["post_id"])
+}
+
+func TestUpdatePost(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Creating a new post
+	newPost := models.Post{
+		Title:   "Saul's update post",
+		Content: ".....to test updatePost's functionality......",
+	}
+	jsonValue, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonValue))
+
+	req.AddCookie(&http.Cookie{
+		Name:  "session_token",
+		Value: testSessionToken,
+	})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Extracting post ID from the response
+	var createResponse map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &createResponse)
+	postID := createResponse["data"].(map[string]interface{})["post_id"].(string)
+
+	// Updating the post
+	updatedPost := models.Post{
+		Content: "To test updatePost's functionality",
+	}
+	jsonValue, _ = json.Marshal(updatedPost)
+
+	req, _ = http.NewRequest("PUT", "/api/v1/post/"+postID, bytes.NewBuffer(jsonValue))
+	req.AddCookie(&http.Cookie{
+		Name:  "session_token",
+		Value: testSessionToken,
+	})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Post updated successfully")
+}
+
+func TestDeletePost(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Creating a temporary post
+	newPost := models.Post{
+		Title:   "Saul's deleting post",
+		Content: "to test deletePost's functionality",
+	}
+	jsonValue, _ := json.Marshal(newPost)
+
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonValue))
+	req.AddCookie(&http.Cookie{
+		Name:  "session_token",
+		Value: testSessionToken,
+	})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Extracting the post ID from the response
+	var createResponse map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &createResponse)
+	postID := createResponse["data"].(map[string]interface{})["post_id"].(string)
+
+	// Deleting the post
+	req, _ = http.NewRequest("DELETE", "/api/v1/post/"+postID, nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "session_token",
+		Value: testSessionToken,
+	})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Post deleted successfully")
+
+}
+
+func TestGetUserPosts(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	req, _ := http.NewRequest("GET", "/api/v1/member/saul/posts", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	posts := response["data"].([]interface{})
+	assert.NotEmpty(t, posts)
+}
+
+func TestIncrementPostViews(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Creating a new post
+	newPost := models.Post{
+		Title:   "Saul's increment view post",
+		Content: "To test incrementPostViews' functionality",
+	}
+	jsonValue, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonValue))
+
+	req.AddCookie(&http.Cookie{
+		Name:  "session_token",
+		Value: testSessionToken,
+	})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Extracting post ID from the response
+	var createResponse map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &createResponse)
+	postID := createResponse["data"].(map[string]interface{})["post_id"].(string)
+
+	req, _ = http.NewRequest("PUT", "/api/v1/post/"+postID+"/increment-views", nil)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "View count incremented")
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NotEmpty(t, response["views"])
+
+	//Deleting user created for testing Post's APIs
+	TestDeleteMember(t)
 }
