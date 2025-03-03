@@ -18,13 +18,13 @@ Incomplete:
 - Messaging system
 - Notification system
 ### Backend
-Incomplete:
+Completed:
 - Created database schema for Posts and Comments
 - Get current logged in user api
 - Create posts, get all posts, get specific post, get all posts from a specific user, updating a post, deleting a specifc post
 - Create comments, get all comments in a post, get a specific comment, deleting a specific comment
 
-Inprogress:
+Incomplete:
 - Unit tests
 - Swagger Documentation
 
