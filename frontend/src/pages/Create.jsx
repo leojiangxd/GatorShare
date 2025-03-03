@@ -3,6 +3,8 @@ import NavBar from "./components/NavBar";
 import { Paperclip } from "lucide-react";
 import { getCsrfToken } from "../utils/functions";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
