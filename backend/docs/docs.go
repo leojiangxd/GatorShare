@@ -244,13 +244,10 @@ const docTemplate = `{
         "models.Member": {
             "type": "object",
             "properties": {
-                "CreatedAt": {
-                    "type": "string"
-                },
-                "UpdatedAt": {
-                    "type": "string"
-                },
                 "bio": {
+                    "type": "string"
+                },
+                "createdAt": {
                     "type": "string"
                 },
                 "csrf_token": {
@@ -263,6 +260,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "session_token": {
+                    "type": "string"
+                },
+                "updatedAt": {
                     "type": "string"
                 },
                 "username": {
@@ -283,6 +283,8 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "Backend API for the GatorShare app",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
+	LeftDelim:        "{{",
+	RightDelim:       "}}",
 }
 
 func init() {

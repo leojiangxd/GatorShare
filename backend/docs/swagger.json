@@ -238,13 +238,10 @@
         "models.Member": {
             "type": "object",
             "properties": {
-                "CreatedAt": {
-                    "type": "string"
-                },
-                "UpdatedAt": {
-                    "type": "string"
-                },
                 "bio": {
+                    "type": "string"
+                },
+                "createdAt": {
                     "type": "string"
                 },
                 "csrf_token": {
@@ -257,6 +254,9 @@
                     "type": "string"
                 },
                 "session_token": {
+                    "type": "string"
+                },
+                "updatedAt": {
                     "type": "string"
                 },
                 "username": {
