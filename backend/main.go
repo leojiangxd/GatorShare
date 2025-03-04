@@ -10,8 +10,18 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	swaggerFiles "github.com/swaggo/files"     // swagger embed files
+	ginSwagger "github.com/swaggo/gin-swagger" // gin-swagger middleware
 	"gshare.com/platform/models"
+
+	"gshare.com/platform/docs"
 )
+
+// @title GatorShare API
+// @version 1.0
+// @description Backend APIs for the GatorShare app
+// @host localhost:8080
+// @BasePath /api/v1
 
 var db *gorm.DB
 
@@ -32,6 +42,9 @@ func checkErr(err error) {
 }
 
 func main() {
+
+	docs.SwaggerInfo.Title = "GatorShare API"
+
 	err := connectDatabase()
 	checkErr(err)
 
@@ -49,8 +62,8 @@ func main() {
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/", index)
-		
-		// user routes
+
+		// member routes
 		v1.GET("member", getMembers)
 		v1.GET("member/:username", getMemberByUsername)
 		v1.POST("register", register)
@@ -61,7 +74,7 @@ func main() {
 		v1.OPTIONS("member", options)
 
 		v1.GET("current-user", getCurrentUser)
-		
+
 		// post routes
 		v1.GET("post", getPosts)
 		v1.GET("post/:postId", getPostById)
@@ -79,6 +92,9 @@ func main() {
 
 	}
 
+	// use ginSwagger middleware to serve the API docs
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// By default it serves on :8080 unless a
 	// PORT environment variable was defined.
 	r.Run()
@@ -90,6 +106,16 @@ func index(c *gin.Context) {
 
 }
 
+// GetMembers godoc
+//
+//	@Summary		Lists the first 10 members
+//	@Description	This API gets the first 10 Member entities from the database
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object} string "Success"
+//	@Failure 		400 {object} string "Bad Request"
+//	@Router			/member [get]
 func getMembers(c *gin.Context) {
 
 	var members []models.Member
@@ -106,6 +132,17 @@ func getMembers(c *gin.Context) {
 	}
 }
 
+// GetMemberByUsername godoc
+//
+//	@Summary		Gets a member's info by their username
+//	@Description	This API fetches a Member entity by their unique username
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			username	path		string	true	"Username"
+//	@Success		200	{object} string "Success"
+//	@Failure 		400 {object} string "Bad Request"
+//	@Router			/member/{username} [get]
 func getMemberByUsername(c *gin.Context) {
 
 	username := c.Param("username")
@@ -122,6 +159,17 @@ func getMemberByUsername(c *gin.Context) {
 	}
 }
 
+// Register godoc
+//
+//	@Summary		Registers a new member
+//	@Description	This API is used to add a Member entity to the database
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"New member"
+//	@Success		201	{object} string "Created"
+//	@Failure 		400 {object} string "Bad Request"
+//	@Router			/register [post]
 func register(c *gin.Context) {
 
 	var newMember models.Member
@@ -146,7 +194,7 @@ func register(c *gin.Context) {
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
 	}
-	
+
 	//Generate tokens and pass to user cookies
 	sessionToken := generateToken(32)
 	csrfToken := generateToken(32)
@@ -156,9 +204,20 @@ func register(c *gin.Context) {
 
 	//Store tokens in the database
 	db.Model(&newMember).Where("username = ?", newMember.Username).Updates(map[string]any{"session_token": sessionToken, "csrf_token": csrfToken})
-	c.JSON(http.StatusOK, gin.H{"message": "Register successful"})
+	c.JSON(http.StatusCreated, gin.H{"message": "Successfully registered user: " + newMember.Username})
 }
 
+// Login godoc
+//
+//		@Summary		Logs in an existing member
+//		@Description	This API is used to login a member by using the stored credentials in the database
+//		@Tags			member
+//		@Accept			json
+//		@Produce		json
+//		@Param			member	body	models.Member	true	"Member username and password"
+//		@Success		200	{object} string "Success"
+//	 	@Failure 		400 {object} string "Bad Request"
+//		@Router			/login [post]
 func login(c *gin.Context) {
 
 	var loginInfo models.Member
@@ -192,6 +251,18 @@ func login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
 }
 
+// Logout godoc
+//
+//	@Summary		Logs out a currently logged in member
+//	@Description	This API clears the tokens in the cookies and database for the logged in Member
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"Member username"
+//	@Success		200	{object} string "Success"
+//	@Failure 		401 {object} string "Unauthorized"
+//	@Failure 		404 {object} string "Not Found"
+//	@Router			/logout [post]
 func logout(c *gin.Context) {
 
 	//Check if user is logged in
@@ -225,6 +296,19 @@ func logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
 
+// UpdateMember godoc
+//
+//	@Summary		Updates a members information
+//	@Description	This API updates the field values for the logged-in Member
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"Updated member info"
+//	@Success		200	{object} string "Success"
+//	@Failure 		400 {object} string "Bad Request"
+//	@Failure 		401 {object} string "Unauthorized"
+//	@Failure 		404 {object} string "Not Found"
+//	@Router			/member [put]
 func updateMember(c *gin.Context) {
 
 	//Check if user is logged in
@@ -262,10 +346,22 @@ func updateMember(c *gin.Context) {
 		}
 	}
 
-	db.Model(&member).Where("username = ?", username).Updates(models.Member{Email: member.Email, Username: member.Username, Password: member.Password})
+	db.Model(&member).Where("username = ?", username).Updates(models.Member{Email: member.Email, Username: member.Username, Password: member.Password, Bio: member.Bio})
 	c.JSON(http.StatusOK, gin.H{"data": member})
 }
 
+// DeleteMember godoc
+//
+//	@Summary		Deletes a member from the system
+//	@Description	This API removes the Member entity from the database for the logged-in Member
+//	@Tags			member
+//	@Accept			json
+//	@Produce		json
+//	@Param			member	body		models.Member	true	"Member username"
+//	@Success		200	{object} string "Success"
+//	@Failure 		401 {object} string "Unauthorized"
+//	@Failure 		404 {object} string "Not Found"
+//	@Router			/member [delete]
 func deleteMember(c *gin.Context) {
 
 	//Check if user is logged in
@@ -291,29 +387,59 @@ func deleteMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member deleted successfully"})
 }
 
+// Options godoc
+//
+// @Summary			Handles OPTIONS requests
+// @Description 	This API handles OPTIONS requests for CORS preflight
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Success 		200 {object} string "Success"
+// @Router 			/member [options]
 func options(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "options Called"})
 
 }
 
+// GetCurrentUser godoc
+//
+// @Summary 		Gets the current logged-in member
+// @Description 	This API returns the username of the currently logged-in Member
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Success 		200 {object} string "Success"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		403 {object} string "Forbidden"
+// @Router 			/current-user [get]
 func getCurrentUser(c *gin.Context) {
 	// Check if user is logged in
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	username := getUsername(c)
 	if username == "" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized 2"})
 		return
 	}
-	
+
 	// Return the username
 	c.JSON(http.StatusOK, gin.H{"username": username})
 }
 
+// GetPosts godoc
+//
+// @Summary 		Retrieves all posts
+// @Description 	This API fetches all posts from the database ordered by creation date
+// @Tags 			post
+// @Accept 			json
+// @Produce 		json
+// @Success 		200 {array} models.Post
+// @Failure 		400 {object} string "Bad Request"
+// @Router 			/post [get]
 func getPosts(c *gin.Context) {
 	var posts []models.Post
 
@@ -328,6 +454,17 @@ func getPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": posts})
 }
 
+// GetPostById godoc
+//
+// @Summary 		Retrieves a specific post by ID
+// @Description 	This API fetches a post and its comments by the post ID
+// @Tags 			post
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Success 		200 {object} models.Post
+// @Failure 		400 {object} string "Bad Request"
+// @Router 			/post/{postId} [get]
 func getPostById(c *gin.Context) {
 	postId := c.Param("postId")
 	var post models.Post
@@ -345,7 +482,18 @@ func getPostById(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": post})
 }
 
-
+// CreatePost godoc
+//
+// @Summary 	Creates a new post
+// @Description This API creates a new post for the logged-in member
+// @Tags 		post
+// @Accept 		json
+// @Produce 	json
+// @Param 		post body models.Post true "New post"
+// @Success 	200 {object} models.Post
+// @Failure 	400 {object} string "Bad Request"
+// @Failure 	401 {object} string "Unauthorized"
+// @Router 		/post [post]
 func createPost(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -362,14 +510,14 @@ func createPost(c *gin.Context) {
 	username := getUsername(c)
 	post.Author = username
 
-	if post.Title == "" || post.Content == ""{
+	if post.Title == "" || post.Content == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
 		return
 	}
 
 	if post.Images == nil {
-        post.Images = models.StringArray{}
-    }
+		post.Images = models.StringArray{}
+	}
 	post.PostId = uuid.New().String()
 	post.Comments = []models.Comment{}
 
@@ -382,6 +530,19 @@ func createPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post created successfully", "data": post})
 }
 
+// DeletePost godoc
+//
+// @Summary 	Deletes a post
+// @Description This API deletes a post by its ID if the logged-in member is the author
+// @Tags 		post
+// @Accept 		json
+// @Produce 	json
+// @Param 		postId path string true "Post ID"
+// @Success 	200 {object} string
+// @Failure 	400 {object} string "Bad Request"
+// @Failure 	401 {object} string "Unauthorized"
+// @Failure 	403 {object} string "Forbidden"
+// @Router 		/post/{postId} [delete]
 func deletePost(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -405,6 +566,20 @@ func deletePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
 }
 
+// UpdatePost godoc
+//
+// @Summary 	Updates a post
+// @Description This API updates a post's content if the logged-in member is the author
+// @Tags 		post
+// @Accept 		json
+// @Produce 	json
+// @Param 		postId path string true "Post ID"
+// @Param 		post body models.Post true "Updated post"
+// @Success 	200 {object} models.Post
+// @Failure 	400 {object} string "Bad Request"
+// @Failure 	401 {object} string "Unauthorized"
+// @Failure 	403 {object} string "Forbidden"
+// @Router 		/post/{postId} [put]
 func updatePost(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -429,10 +604,21 @@ func updatePost(c *gin.Context) {
 		return
 	}
 
-	db.Save(&post)
+	db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{Title: post.Title, Content: post.Content})
 	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
 }
 
+// GetUserPosts godoc
+//
+// @Summary 	Retrieves posts by a specific user
+// @Description This API fetches all posts created by a specific member
+// @Tags 		post
+// @Accept 		json
+// @Produce 	json
+// @Param		member	body		models.Member	true	"Member username"
+// @Success 	200 {array} models.Post
+// @Failure 	500 {object} string "Internal Server Error"
+// @Router 		/member/{username}/posts [get]
 func getUserPosts(c *gin.Context) {
 	username := c.Param("username")
 
@@ -446,6 +632,17 @@ func getUserPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": posts})
 }
 
+// IncrementPostViews godoc
+//
+// @Summary 	Increments the view count of a post
+// @Description This API increments the view count of a specific post by its ID
+// @Tags 		post
+// @Accept 		json
+// @Produce 	json
+// @Param 		postId path string true "Post ID"
+// @Success 	200 {object} string
+// @Failure 	400 {object} string "Bad Request"
+// @Router 		/post/{postId}/increment-views [put]
 func incrementPostViews(c *gin.Context) {
 	postId := c.Param("postId")
 
@@ -472,7 +669,7 @@ func incrementPostViews(c *gin.Context) {
 
 func getComments(c *gin.Context) {
 	postId := c.Param("postId")
-	
+
 	// Find the post first
 	var post models.Post
 	if err := db.First(&post, "post_id = ?", postId).Error; err != nil {
@@ -495,10 +692,10 @@ func getComments(c *gin.Context) {
 func getCommentById(c *gin.Context) {
 	postId := c.Param("postId")
 	commentId := c.Param("commentId")
-	
+
 	var comment models.Comment
 	result := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId)
-	
+
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment not found"})
 		return
@@ -513,44 +710,44 @@ func createComment(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	username := getUsername(c)
 	if username == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	// Get the post ID from URL parameter
 	postId := c.Param("postId")
-	
+
 	// Verify the post exists
 	var post models.Post
 	if err := db.First(&post, "post_id = ?", postId).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Post not found"})
 		return
 	}
-	
+
 	var newComment models.Comment
-	
+
 	// Bind the JSON request to the comment struct
 	if err := c.ShouldBindJSON(&newComment); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	// Validate comment content
 	if newComment.Content == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment content is required"})
 		return
 	}
-	
+
 	// Set comment fields
 	newComment.Author = username
 	newComment.PostID = postId
 	newComment.CommentId = uuid.New().String()
 	newComment.Likes = 0
 	newComment.Dislikes = 0
-	
+
 	// Create the comment in the database
 	result := db.Create(&newComment)
 	if result.Error != nil {
@@ -566,32 +763,32 @@ func deleteComment(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	username := getUsername(c)
 	if username == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	// Get parameters from URL
 	postId := c.Param("postId")
 	commentId := c.Param("commentId")
-	
+
 	// Find the comment
 	var comment models.Comment
 	result := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId)
-	
+
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment not found"})
 		return
 	}
-	
+
 	// Check if the user is the author of the comment
 	if comment.Author != username {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "You can only delete your own comments"})
 		return
 	}
-	
+
 	// Delete the comment
 	db.Delete(&comment)
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
