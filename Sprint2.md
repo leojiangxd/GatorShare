@@ -111,7 +111,5 @@ Incomplete:
 - Then build the backend application using `go build` and run `platform.exe`
 - Once the backend application is running, the documentation can be found at: http://localhost:8080/swagger/index.html#/member
 
-## Demos
-- [Integrated Application Demo](https://youtu.be/WVI0q96o_bc?si=bK06mV_s4whQu8LY)
-- [Frontend Unit Testing Demo](https://drive.google.com/file/d/1hIu5GaK_aPSH3oM1sUGyMFDxQYmiuMam/view?usp=sharing)
-- [FullVideo] (COMBINED LINK HERE)
+## Sprint Video
+- https://youtu.be/j69Qgz1VkJs
