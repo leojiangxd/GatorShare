@@ -1,5 +1,22 @@
 basePath: /api/v1
 definitions:
+  models.Comment:
+    properties:
+      author:
+        type: string
+      comment_id:
+        type: string
+      content:
+        type: string
+      createdAt:
+        type: string
+      dislikes:
+        type: integer
+      likes:
+        type: integer
+      post_id:
+        type: string
+    type: object
   models.Member:
     properties:
       bio:
@@ -19,18 +36,69 @@ definitions:
       username:
         type: string
     type: object
+  models.Post:
+    properties:
+      author:
+        type: string
+      comments:
+        items:
+          $ref: '#/definitions/models.Comment'
+        type: array
+      content:
+        type: string
+      createdAt:
+        type: string
+      dislikes:
+        type: integer
+      images:
+        items:
+          type: string
+        type: array
+      likes:
+        type: integer
+      post_id:
+        type: string
+      title:
+        type: string
+      views:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact: {}
-  description: Backend API for the GatorShare app
+  description: Backend APIs for the GatorShare app
   title: GatorShare API
   version: "1.0"
 paths:
+  /current-user:
+    get:
+      consumes:
+      - application/json
+      description: This API returns the username of the currently logged-in Member
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+      summary: Gets the current logged-in member
+      tags:
+      - member
   /login:
     post:
       consumes:
       - application/json
-      description: login user
+      description: This API is used to login a member by using the stored credentials
+        in the database
       parameters:
       - description: Member username and password
         in: body
@@ -42,17 +110,22 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Success
           schema:
             type: string
-      summary: Logs in an existing user
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Logs in an existing member
       tags:
       - member
   /logout:
     post:
       consumes:
       - application/json
-      description: logout user
+      description: This API clears the tokens in the cookies and database for the
+        logged in Member
       parameters:
       - description: Member username
         in: body
@@ -64,17 +137,26 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Success
           schema:
             type: string
-      summary: Logs out a currently logged in user
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      summary: Logs out a currently logged in member
       tags:
       - member
   /member:
     delete:
       consumes:
       - application/json
-      description: delete user
+      description: This API removes the Member entity from the database for the logged-in
+        Member
       parameters:
       - description: Member username
         in: body
@@ -86,7 +168,15 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Success
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
           schema:
             type: string
       summary: Deletes a member from the system
@@ -95,23 +185,39 @@ paths:
     get:
       consumes:
       - application/json
-      description: get members
+      description: This API gets the first 10 Member entities from the database
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Success
           schema:
-            items:
-              $ref: '#/definitions/models.Member'
-            type: array
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
       summary: Lists the first 10 members
+      tags:
+      - member
+    options:
+      consumes:
+      - application/json
+      description: This API handles OPTIONS requests for CORS preflight
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: string
+      summary: Handles OPTIONS requests
       tags:
       - member
     put:
       consumes:
       - application/json
-      description: update user
+      description: This API updates the field values for the logged-in Member
       parameters:
       - description: Updated member info
         in: body
@@ -123,7 +229,19 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Success
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
           schema:
             type: string
       summary: Updates a members information
@@ -133,7 +251,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: get member by username
+      description: This API fetches a Member entity by their unique username
       parameters:
       - description: Username
         in: path
@@ -144,19 +262,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Success
           schema:
-            $ref: '#/definitions/models.Member'
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
       summary: Gets a member's info by their username
       tags:
       - member
-  /register:
-    post:
+  /member/{username}/posts:
+    get:
       consumes:
       - application/json
-      description: resgister user
+      description: This API fetches all posts created by a specific member
       parameters:
-      - description: New member
+      - description: Member username
         in: body
         name: member
         required: true
@@ -168,8 +290,213 @@ paths:
         "200":
           description: OK
           schema:
+            items:
+              $ref: '#/definitions/models.Post'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
             type: string
-      summary: Registers a new user
+      summary: Retrieves posts by a specific user
+      tags:
+      - post
+  /post:
+    get:
+      consumes:
+      - application/json
+      description: This API fetches all posts from the database ordered by creation
+        date
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Post'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Retrieves all posts
+      tags:
+      - post
+    post:
+      consumes:
+      - application/json
+      description: This API creates a new post for the logged-in member
+      parameters:
+      - description: New post
+        in: body
+        name: post
+        required: true
+        schema:
+          $ref: '#/definitions/models.Post'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Creates a new post
+      tags:
+      - post
+  /post/{postId}:
+    delete:
+      consumes:
+      - application/json
+      description: This API deletes a post by its ID if the logged-in member is the
+        author
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+      summary: Deletes a post
+      tags:
+      - post
+    get:
+      consumes:
+      - application/json
+      description: This API fetches a post and its comments by the post ID
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Retrieves a specific post by ID
+      tags:
+      - post
+    put:
+      consumes:
+      - application/json
+      description: This API updates a post's content if the logged-in member is the
+        author
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Updated post
+        in: body
+        name: post
+        required: true
+        schema:
+          $ref: '#/definitions/models.Post'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+      summary: Updates a post
+      tags:
+      - post
+  /post/{postId}/increment-views:
+    put:
+      consumes:
+      - application/json
+      description: This API increments the view count of a specific post by its ID
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Increments the view count of a post
+      tags:
+      - post
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: This API is used to add a Member entity to the database
+      parameters:
+      - description: New member
+        in: body
+        name: member
+        required: true
+        schema:
+          $ref: '#/definitions/models.Member'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Registers a new member
       tags:
       - member
 swagger: "2.0"
