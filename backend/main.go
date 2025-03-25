@@ -316,20 +316,17 @@ func logout(c *gin.Context) {
 //	@Failure 		404 {object} string "Not Found"
 //	@Router			/member [put]
 func updateMember(c *gin.Context) {
-    // Check if user is logged in
     if err := Authorize(c); err != nil {
         c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
         return
     }
 
-    // Get current username
     username := getUsername(c)
     if username == "" {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
         return
     }
 
-    // Struct for update request
     type UpdateRequest struct {
         CurrentPassword string `json:"currentPassword"`
         NewUsername     string `json:"username"`
@@ -338,21 +335,18 @@ func updateMember(c *gin.Context) {
         Bio             string `json:"bio"`
     }
 
-    // Bind update request
     var updateReq UpdateRequest
     if err := c.ShouldBindJSON(&updateReq); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
     }
 
-    // Fetch current member
     var currentMember models.Member
     if err := db.First(&currentMember, "username = ?", username).Error; err != nil {
         c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
         return
     }
 
-    // Check if new username already exists (if different from current)
     if updateReq.NewUsername != "" && updateReq.NewUsername != username {
         var existingUser models.Member
         if err := db.First(&existingUser, "username = ?", updateReq.NewUsername).Error; err == nil {
@@ -361,7 +355,6 @@ func updateMember(c *gin.Context) {
         }
     }
 
-    // Check if new email already exists (if different from current)
     if updateReq.NewEmail != "" && updateReq.NewEmail != currentMember.Email {
         var existingUser models.Member
         if err := db.First(&existingUser, "email = ?", updateReq.NewEmail).Error; err == nil {
@@ -370,44 +363,53 @@ func updateMember(c *gin.Context) {
         }
     }
 
-    // Password change logic
     if updateReq.NewPassword != "" {
-		if (updateReq.CurrentPassword == "") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Enter your current password"})
+        if updateReq.CurrentPassword == "" {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Enter your current password"})
             return
-		}
-
-        // Verify current password
+        }
         if !checkPasswordHash(updateReq.CurrentPassword, currentMember.Password) {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
             return
         }
-
-        // Hash new password
         hashedNewPassword, _ := hashPassword(updateReq.NewPassword)
-
-        // Update with new password
         currentMember.Password = hashedNewPassword
     }
 
-    // Update other fields
-    if updateReq.NewUsername != "" {
-        currentMember.Username = updateReq.NewUsername
-    }
-    if updateReq.NewEmail != "" {
-        currentMember.Email = updateReq.NewEmail
-    }
-    if updateReq.Bio != "" {
-        currentMember.Bio = updateReq.Bio
-    }
+    err := db.Transaction(func(tx *gorm.DB) error {
+        // Update username in posts and comments if changed
+        if updateReq.NewUsername != "" && updateReq.NewUsername != username {
+            // Update posts
+            if err := tx.Model(&models.Post{}).Where("author = ?", username).Update("author", updateReq.NewUsername).Error; err != nil {
+                return err
+            }
 
-    // Save updates
-    if err := db.Save(&currentMember).Error; err != nil {
+            // Update comments
+            if err := tx.Model(&models.Comment{}).Where("author = ?", username).Update("author", updateReq.NewUsername).Error; err != nil {
+                return err
+            }
+
+            // Update the current member's username
+            if err := tx.Model(&currentMember).Update("username", updateReq.NewUsername).Error; err != nil {
+                return err
+            }
+            username = updateReq.NewUsername // Update reference
+        }
+
+        if updateReq.NewEmail != "" {
+            currentMember.Email = updateReq.NewEmail
+        }
+        if updateReq.Bio != "" {
+            currentMember.Bio = updateReq.Bio
+        }
+        return tx.Save(&currentMember).Error
+    })
+
+    if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
         return
     }
 
-    // Prepare response (avoid returning sensitive data)
     responseData := gin.H{
         "username": currentMember.Username,
         "email":    currentMember.Email,
@@ -430,28 +432,50 @@ func updateMember(c *gin.Context) {
 //	@Failure 		404 {object} string "Not Found"
 //	@Router			/member [delete]
 func deleteMember(c *gin.Context) {
+    // Check if user is logged in
+    if err := Authorize(c); err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": err})
+        return
+    }
 
-	//Check if user is logged in
-	if err := Authorize(c); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err})
-		return
-	}
+    username := getUsername(c)
+    if username == "" {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
 
-	username := getUsername(c)
-	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
+    var member models.Member
+    if err := db.First(&member, "username = ?", username).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+        return
+    }
 
-	var member models.Member
+    // Start a transaction to ensure all updates happen atomically
+    err := db.Transaction(func(tx *gorm.DB) error {
+        // Update posts to mark author as [deleted]
+        if err := tx.Model(&models.Post{}).Where("author = ?", username).Update("author", "[deleted]").Error; err != nil {
+            return err
+        }
 
-	if err := db.First(&member, "username = ?", username).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
-		return
-	}
+        // Update comments to mark author as [deleted]
+        if err := tx.Model(&models.Comment{}).Where("author = ?", username).Update("author", "[deleted]").Error; err != nil {
+            return err
+        }
 
-	db.Delete(&member)
-	c.JSON(http.StatusOK, gin.H{"message": "Member deleted successfully"})
+        // Delete the member
+        if err := tx.Delete(&member).Error; err != nil {
+            return err
+        }
+
+        return nil
+    })
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete member"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Member deleted successfully"})
 }
 
 // Options godoc

@@ -71,7 +71,7 @@ const NavBar = () => {
         setIsLoggedIn(false);
       })
       .catch((error) => {
-        console.alert("Logout failed:", error);
+        console.log("Logout failed:", error);
       });
   };
 

@@ -91,7 +91,7 @@ const User = () => {
         },
         withCredentials: true,
       });
-      setIsEditing(false);
+      navigate(`/user/${username}`)
     } catch (error) {
       console.error("Error updating profile:", error.response ? error.response.data : error.message);
       alert(`Failed to update profile:\n${error.response ? error.response.data.error : error.message}`);
@@ -145,7 +145,7 @@ const User = () => {
         location.reload();
       })
       .catch((error) => {
-        console.alert("Logout failed:", error);
+        console.log("Logout failed:", error);
       });
   };
 
