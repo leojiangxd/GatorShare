@@ -186,6 +186,12 @@ func register(c *gin.Context) {
 		return
 	}
 
+		// Check if the email already exists
+		if err := db.Select("*").Where("email = ?", newMember.Email).First(&models.Member{}).Error; err == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Email already exists"})
+			return
+		}
+
 	//Hash the password using bcrypt
 	newMember.Password, _ = hashPassword(newMember.Password)
 
@@ -310,44 +316,105 @@ func logout(c *gin.Context) {
 //	@Failure 		404 {object} string "Not Found"
 //	@Router			/member [put]
 func updateMember(c *gin.Context) {
+    // Check if user is logged in
+    if err := Authorize(c); err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+        return
+    }
 
-	//Check if user is logged in
-	if err := Authorize(c); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
+    // Get current username
+    username := getUsername(c)
+    if username == "" {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
 
-	username := getUsername(c)
-	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
+    // Struct for update request
+    type UpdateRequest struct {
+        CurrentPassword string `json:"currentPassword"`
+        NewUsername     string `json:"username"`
+        NewEmail        string `json:"email"`
+        NewPassword     string `json:"newPassword"`
+        Bio             string `json:"bio"`
+    }
 
-	var member models.Member
+    // Bind update request
+    var updateReq UpdateRequest
+    if err := c.ShouldBindJSON(&updateReq); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	//Check that user exists
-	if err := db.First(&member, "username = ?", username).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No such user" + username})
-		return
-	}
+    // Fetch current member
+    var currentMember models.Member
+    if err := db.First(&currentMember, "username = ?", username).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+        return
+    }
 
-	//Bind updated user
-	if err := c.ShouldBindJSON(&member); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    // Check if new username already exists (if different from current)
+    if updateReq.NewUsername != "" && updateReq.NewUsername != username {
+        var existingUser models.Member
+        if err := db.First(&existingUser, "username = ?", updateReq.NewUsername).Error; err == nil {
+            c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
+            return
+        }
+    }
 
-	//Check if you have to hash new password
-	if member.Password != "" {
-		var err error
-		if member.Password, err = hashPassword(member.Password); err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": err})
-			return
+    // Check if new email already exists (if different from current)
+    if updateReq.NewEmail != "" && updateReq.NewEmail != currentMember.Email {
+        var existingUser models.Member
+        if err := db.First(&existingUser, "email = ?", updateReq.NewEmail).Error; err == nil {
+            c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+            return
+        }
+    }
+
+    // Password change logic
+    if updateReq.NewPassword != "" {
+		if (updateReq.CurrentPassword == "") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Enter your current password"})
+            return
 		}
-	}
 
-	db.Model(&member).Where("username = ?", username).Updates(models.Member{Email: member.Email, Username: member.Username, Password: member.Password, Bio: member.Bio})
-	c.JSON(http.StatusOK, gin.H{"data": member})
+        // Verify current password
+        if !checkPasswordHash(updateReq.CurrentPassword, currentMember.Password) {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
+            return
+        }
+
+        // Hash new password
+        hashedNewPassword, _ := hashPassword(updateReq.NewPassword)
+
+        // Update with new password
+        currentMember.Password = hashedNewPassword
+    }
+
+    // Update other fields
+    if updateReq.NewUsername != "" {
+        currentMember.Username = updateReq.NewUsername
+    }
+    if updateReq.NewEmail != "" {
+        currentMember.Email = updateReq.NewEmail
+    }
+    if updateReq.Bio != "" {
+        currentMember.Bio = updateReq.Bio
+    }
+
+    // Save updates
+    if err := db.Save(&currentMember).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+        return
+    }
+
+    // Prepare response (avoid returning sensitive data)
+    responseData := gin.H{
+        "username": currentMember.Username,
+        "email":    currentMember.Email,
+        "bio":      currentMember.Bio,
+    }
+
+    c.JSON(http.StatusOK, gin.H{"data": responseData})
 }
 
 // DeleteMember godoc

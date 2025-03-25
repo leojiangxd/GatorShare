@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import PostCard from "./components/PostCard";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
@@ -7,32 +7,48 @@ import { getCsrfToken, getUsername } from "../utils/functions";
 import axios from "axios";
 
 const User = () => {
-  const [loggedInUsername, setLoggedInUsername] = useState("");
-  useEffect(() => {
-    const fetchUsername = async () => {
-      const username = await getUsername();
-      setLoggedInUsername(username || "");
-    };
-
-    fetchUsername();
-  }, []);
+  const navigate = useNavigate();
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-
+  
   const { id } = useParams();
-  // Use a safeId to guard against undefined id values.
-  const safeId = id || "";
-  const ownProfile =
-    safeId.toLowerCase().trim() === loggedInUsername.toLowerCase().trim();
+  const [loggedInUsername, setLoggedInUsername] = useState("");
+  const [ownProfile, setOwnProfile] = useState(false);
 
   // Toggle between view and edit modes.
   const [isEditing, setIsEditing] = useState(false);
 
   // Profile state.
-  const [username, setUsername] = useState(safeId);
+  const [username, setUsername] = useState(id);
   const [email, setEmail] = useState("example@example.com");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [bio, setBio] = useState("Tell us something about yourself...");
+  const [bio, setBio] = useState("");
+
+  // Fetch Profile Details
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      try {
+        const loggedInUser = await getUsername();
+        setLoggedInUsername(loggedInUser || "");
+
+        const isOwnProfile = id.toLowerCase().trim() === loggedInUser.toLowerCase().trim();
+        setOwnProfile(isOwnProfile);
+
+        if (ownProfile) {
+          // Fetch member details
+          const memberResponse = await axios.get(`${apiBaseUrl}/api/v1/member/${id}`);
+          const memberData = memberResponse.data.data;
+          // Populate profile fields
+          setEmail(memberData.email);
+          setBio(memberData.bio);
+        }
+      } catch (error) {
+        console.error("Error fetching user details:", error);
+      }
+    };
+
+    fetchUserDetails();
+  }, [apiBaseUrl, id, loggedInUsername]);
 
   // Loop through each post and calculate the total likes and dislikes
   const calcLikesAndDislikes = (posts) => {
@@ -48,17 +64,70 @@ const User = () => {
   };
 
   // Handlers to simulate actions.
-  const handleSave = () => {
-    alert("Profile updated!");
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      const updatedInfo = {
+        currentPassword,
+        username,
+        email,
+        bio,
+      };
+
+      if (newPassword) {
+        updatedInfo.newPassword = newPassword;
+      }
+
+      console.log(updatedInfo)
+      // Send update request
+      await axios.put(`${apiBaseUrl}/api/v1/member`, updatedInfo, {
+        headers: {
+          "X-CSRF-Token": csrfToken,
+        },
+        withCredentials: true,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating profile:", error.response ? error.response.data : error.message);
+      alert(`Failed to update profile:\n${error.response ? error.response.data.error : error.message}`);
+    } finally {
+      setCurrentPassword("");
+      setNewPassword("");
+    }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
   };
 
-  const handleDelete = () => {
-    alert("Profile deleted!");
+  const handleDelete = async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+      await axios.delete(`${apiBaseUrl}/api/v1/member`, {
+        headers: {
+          "X-CSRF-Token": csrfToken || "",
+        },
+        withCredentials: true,
+      });
+      navigate("/");
+      console.log("Member deleted successfully");
+    } catch (error) {
+      console.error(
+        "Error deleting :",
+        error.response ? error.response.data : error.message
+      );
+    }
   };
 
   const handleLogout = async () => {
@@ -88,7 +157,7 @@ const User = () => {
     const fetchPosts = async () => {
       try {
         const response = await axios.get(
-          `${apiBaseUrl}/api/v1/member/${safeId}/posts`
+          `${apiBaseUrl}/api/v1/member/${id}/posts`
         );
         setPosts(response.data.data);
       } catch {
@@ -96,7 +165,7 @@ const User = () => {
       }
     };
     fetchPosts();
-  }, [apiBaseUrl, safeId]);
+  }, [apiBaseUrl, id]);
   const { totalLikes, totalDislikes } = calcLikesAndDislikes(posts);
 
   return (
@@ -110,10 +179,10 @@ const User = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="avatar w-16 h-16 rounded-full flex justify-center items-center bg-primary text-3xl mr-4">
-                  {safeId.trim().charAt(0).toUpperCase()}
+                  {id.trim().charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h2 className="card-title">{safeId}</h2>
+                  <h2 className="card-title">{id}</h2>
                   <p className="flex gap-2">
                     <div className="badge badge-primary text-xs">
                       <ThumbsUp className="w-[1em]" /> {totalLikes}
@@ -223,7 +292,10 @@ const User = () => {
                 </button>
               )
             ) : (
-              <Link to={`/message/${safeId}`} className="btn btn-primary btn-sm">
+              <Link
+                to={`/message/${id}`}
+                className="btn btn-primary btn-sm"
+              >
                 Message
               </Link>
             )}

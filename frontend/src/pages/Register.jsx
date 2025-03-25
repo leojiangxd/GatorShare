@@ -25,7 +25,7 @@ const Register = () => {
         navigate(`/`);
       })
       .catch(error => {
-        alert(`Registration failed: ${JSON.stringify(error.response.data.error)}`);
+        alert(`Registration failed: ${error.response.data.error}`);
       });
   };
 

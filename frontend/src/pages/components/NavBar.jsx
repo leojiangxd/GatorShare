@@ -67,6 +67,7 @@ const NavBar = () => {
         }
       )
       .then(() => {
+        navigate("/");
         setIsLoggedIn(false);
       })
       .catch((error) => {

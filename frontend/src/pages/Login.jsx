@@ -23,7 +23,7 @@ const Login = () => {
         navigate(`/`);
       })
       .catch(error => {
-        alert(`Login failed: ${JSON.stringify(error.response.data.error)}`);
+        alert(`Login failed: ${error.response.data.error}`);
       });
   };
 
