@@ -84,7 +84,6 @@ const User = () => {
         updatedInfo.newPassword = newPassword;
       }
 
-      console.log(updatedInfo)
       // Send update request
       await axios.put(`${apiBaseUrl}/api/v1/member`, updatedInfo, {
         headers: {
@@ -121,7 +120,6 @@ const User = () => {
         withCredentials: true,
       });
       navigate("/");
-      console.log("Member deleted successfully");
     } catch (error) {
       console.error(
         "Error deleting :",
