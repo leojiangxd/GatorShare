@@ -534,24 +534,39 @@ func getCurrentUser(c *gin.Context) {
 func getPosts(c *gin.Context) {
 
 	type PostQuery struct {
-		Column string
-		Order  string
-		Limit  int
-		Offset int
+		Column string `json:"column"`
+		Order  string `json:"order"`
+		Limit  int    `json:"limit"`
+		Offset int    `json:"offset"`
 	}
 
+	//Start by reading in the sorting column and direction
 	var postQuery PostQuery
 	if err := c.ShouldBindJSON(&postQuery); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	//Start by reading in the sorting column and direction
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if postQuery.Limit == 0 {
+		postQuery.Limit = -1
+	}
+	if postQuery.Offset == 0 {
+		postQuery.Offset = -1
+	}
+
+	//Format the order for sorting
+	var order string
+	if postQuery.Order != "" {
+		order = postQuery.Column + " " + postQuery.Order
+	} else {
+		order = postQuery.Column
+	}
 
 	var posts []models.Post
 
-	// Fetch posts ordered by createdAt descending (latest first)
-	result := db.Preload("Comments").Order("created_at desc").Find(&posts)
+	// Fetch posts ordered by the passed in column, with slices specified
+	result := db.Preload("Comments").Order(order).Limit(postQuery.Limit).Offset(postQuery.Offset).Find(&posts)
 
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
