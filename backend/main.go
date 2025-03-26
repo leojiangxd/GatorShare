@@ -573,7 +573,11 @@ func getPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": posts})
+	//Get the count
+	var count int64
+	db.Table("posts").Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
 }
 
 // GetPostById godoc
