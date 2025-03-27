@@ -17,7 +17,7 @@ const PostCard = ({ post, preview = false }) => {
   const imageContainerRef = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
-  
+
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
 
@@ -78,7 +78,7 @@ const PostCard = ({ post, preview = false }) => {
 
   const navigateEdit = () => {
     navigate(`/edit/post/${id}`);
-  }
+  };
 
   const handleDelete = async () => {
     try {
@@ -165,26 +165,28 @@ const PostCard = ({ post, preview = false }) => {
             {post.author}
           </Link>
           <span className="opacity-50 ml-1">{formatTime(post.CreatedAt)}</span>
-          <div className="dropdown">
-            <div
-              tabIndex={0}
-              role="button"
-              className="rounded-full cursor-pointer"
-            >
-              <ChevronDown className="h-[1em]" />
+          {!preview ? (
+            <div className="dropdown">
+              <div
+                tabIndex={0}
+                role="button"
+                className="rounded-full cursor-pointer"
+              >
+                <ChevronDown className="h-[1em]" />
+              </div>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
+              >
+                <li>
+                  <a onClick={navigateEdit}>Edit</a>
+                </li>
+                <li>
+                  <a onClick={handleDelete}>Delete</a>
+                </li>
+              </ul>
             </div>
-            <ul
-              tabIndex={0}
-              className="dropdown-content menu bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
-            >
-              <li>
-                <a onClick={navigateEdit}>Edit</a>
-              </li>
-              <li>
-                <a onClick={handleDelete}>Delete</a>
-              </li>
-            </ul>
-          </div>
+          ) : null}
         </div>
         <div className="card-actions flex items-center pt-2">
           <div className="badge badge-ghost flex text-xs">
