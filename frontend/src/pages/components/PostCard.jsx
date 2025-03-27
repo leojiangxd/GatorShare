@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, MessageSquare, Send, ThumbsDown, ThumbsUp } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  ChevronDown,
+  Eye,
+  MessageSquare,
+  Send,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { formatTime, getCsrfToken } from "../../utils/functions";
-import axios from 'axios';
-
+import axios from "axios";
 
 const PostCard = ({ post, preview = false }) => {
+  const { id } = useParams();
   const [comment, setComment] = useState("");
   const imageContainerRef = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
-
+  
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
 
@@ -69,22 +76,48 @@ const PostCard = ({ post, preview = false }) => {
     alert("disliked post");
   };
 
+  const navigateEdit = () => {
+    navigate(`/edit/post/${id}`);
+  }
+
+  const handleDelete = async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+      await axios.delete(`${apiBaseUrl}/api/v1/post/${id}`, {
+        headers: {
+          "X-CSRF-Token": csrfToken || "",
+        },
+        withCredentials: true,
+      });
+      navigate("/");
+    } catch (error) {
+      console.error(
+        "Error deleting :",
+        error.response ? error.response.data : error.message
+      );
+    }
+  };
+
   const handleSendComment = async () => {
-    if (comment.trim() == "")
-      return;
+    if (comment.trim() == "") return;
     const csrfToken = getCsrfToken();
-    
+
     if (!csrfToken) {
       console.error("CSRF token is missing.");
       navigate("/login");
       return;
     }
-  
+
     try {
-      console.log(comment)
+      console.log(comment);
       await axios.post(
         `${apiBaseUrl}/api/v1/comment/${post.post_id}`,
-        { content : comment.trim() },
+        { content: comment.trim() },
         {
           headers: {
             "X-CSRF-Token": csrfToken || "",
@@ -92,14 +125,19 @@ const PostCard = ({ post, preview = false }) => {
           withCredentials: true,
         }
       );
-      window.location.reload()
+      window.location.reload();
     } catch (error) {
-      console.error("Error sending comment:", error.response ? error.response.data : error.message);
+      console.error(
+        "Error sending comment:",
+        error.response ? error.response.data : error.message
+      );
     }
   };
-  
+
   const incrementViewCount = async () => {
-    await axios.put(`${apiBaseUrl}/api/v1/post/${post.post_id}/increment-views`)
+    await axios.put(
+      `${apiBaseUrl}/api/v1/post/${post.post_id}/increment-views`
+    );
   };
 
   const handleImageClick = (e, image) => {
@@ -121,13 +159,32 @@ const PostCard = ({ post, preview = false }) => {
 
   const cardContent = (
     <>
-      <h2 className="card-title">{post.title}</h2>
       <span className="text-xs flex flex-wrap">
         <div className="flex flex-auto items-center">
           <Link to={`/user/${post.author}`} className="hover:underline">
             {post.author}
           </Link>
           <span className="opacity-50 ml-1">{formatTime(post.CreatedAt)}</span>
+          <div className="dropdown">
+            <div
+              tabIndex={0}
+              role="button"
+              className="rounded-full cursor-pointer"
+            >
+              <ChevronDown className="h-[1em]" />
+            </div>
+            <ul
+              tabIndex={0}
+              className="dropdown-content menu bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
+            >
+              <li>
+                <a onClick={navigateEdit}>Edit</a>
+              </li>
+              <li>
+                <a onClick={handleDelete}>Delete</a>
+              </li>
+            </ul>
+          </div>
         </div>
         <div className="card-actions flex items-center pt-2">
           <div className="badge badge-ghost flex text-xs">
@@ -151,6 +208,7 @@ const PostCard = ({ post, preview = false }) => {
           </button>
         </div>
       </span>
+      <h2 className="card-title">{post.title}</h2>
       {preview ? (
         <p>
           {post.content.slice(0, 500)}
@@ -165,7 +223,7 @@ const PostCard = ({ post, preview = false }) => {
       )}
 
       {/* Image container */}
-      <div className={`flex justify-center ${images.length > 0 ? 'mt-5' : ''}`}>
+      <div className={`flex justify-center ${images.length > 0 ? "mt-5" : ""}`}>
         <div
           id="imageContainer"
           ref={imageContainerRef}

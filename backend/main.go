@@ -88,6 +88,7 @@ func main() {
 		v1.GET("comment/:postId/", getComments)
 		v1.GET("comment/:postId/:commentId", getCommentById)
 		v1.POST("comment/:postId", createComment)
+		v1.PUT("comment/:postId/:commentId", updateComment)
 		v1.DELETE("comment/:postId/:commentId", deleteComment)
 
 	}
@@ -672,31 +673,50 @@ func deletePost(c *gin.Context) {
 // @Failure 	403 {object} string "Forbidden"
 // @Router 		/post/{postId} [put]
 func updatePost(c *gin.Context) {
-	if err := Authorize(c); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
+    if err := Authorize(c); err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+    var post models.Post
+    if err := db.First(&post, "post_id = ?", c.Param("postId")).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+        return
+    }
 
-	var post models.Post
-	if err := db.First(&post, "post_id = ?", c.Param("postId")).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
-		return
-	}
+    // Check if the post belongs to the logged-in user
+    username := getUsername(c)
+    if post.Author != username {
+        c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own posts"})
+        return
+    }
 
-	// Check if the post belongs to the logged-in user
-	username := getUsername(c)
-	if post.Author != username {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own posts"})
-		return
-	}
+    if err := c.ShouldBindJSON(&post); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	if err := c.ShouldBindJSON(&post); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    if post.Title == "" || post.Content == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
+        return
+    }
 
-	db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{Title: post.Title, Content: post.Content})
-	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
+    if post.Images == nil {
+        post.Images = models.StringArray{}
+    }
+
+    // Update post with new title, content, and images
+    result := db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{
+        Title:   post.Title, 
+        Content: post.Content, 
+        Images:  post.Images,
+    })
+
+    if result.Error != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
 }
 
 // GetUserPosts godoc
@@ -846,6 +866,54 @@ func createComment(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, gin.H{"message": "Comment created successfully", "data": newComment})
 	}
+}
+
+func updateComment(c *gin.Context) {
+    if err := Authorize(c); err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
+    postId := c.Param("postId")
+    commentId := c.Param("commentId")
+
+    var comment models.Comment
+    if err := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+        return
+    }
+
+    // Check if the comment belongs to the logged-in user
+    username := getUsername(c)
+    if comment.Author != username {
+        c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
+        return
+    }
+
+    var updateData struct {
+        Content string `json:"content"`
+    }
+
+    if err := c.ShouldBindJSON(&updateData); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    if updateData.Content == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Comment content cannot be empty"})
+        return
+    }
+
+    comment.Content = updateData.Content
+    if err := db.Save(&comment).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Comment updated successfully", 
+        "data": comment,
+    })
 }
 
 func deleteComment(c *gin.Context) {

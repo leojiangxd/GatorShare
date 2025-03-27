@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import {Home, Login, Post, Register, User, Create} from './pages/pages.js'
+import {Home, Login, Post, Register, User, Create, EditPost} from './pages/pages.js'
 
 const App = () => {
   return (
@@ -10,6 +10,7 @@ const App = () => {
 			<Route path="/login" element={<Login />} />
 			<Route path="/register" element={<Register />} />
 			<Route path="/post/:id" element={<Post />} />
+			<Route path="/edit/post/:id" element={<EditPost />} />
 			<Route path="/user/:id" element={<User />} />
 			<Route path="/create/" element={<Create />} />
 
