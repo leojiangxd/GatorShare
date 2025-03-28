@@ -534,10 +534,11 @@ func getCurrentUser(c *gin.Context) {
 func getPosts(c *gin.Context) {
 
 	type PostQuery struct {
-		Column string `json:"column"`
-		Order  string `json:"order"`
-		Limit  int    `json:"limit"`
-		Offset int    `json:"offset"`
+		Column    string `json:"column"`
+		Order     string `json:"order"`
+		Limit     int    `json:"limit"`
+		Offset    int    `json:"offset"`
+		SearchKey string `json:"search_key"`
 	}
 
 	//Start by reading in the sorting column and direction
@@ -566,7 +567,7 @@ func getPosts(c *gin.Context) {
 	var posts []models.Post
 
 	// Fetch posts ordered by the passed in column, with slices specified
-	result := db.Preload("Comments").Order(order).Limit(postQuery.Limit).Offset(postQuery.Offset).Find(&posts)
+	result := db.Where("title LIKE ?", "%"+postQuery.SearchKey+"%").Or("author LIKE ?", "%"+postQuery.SearchKey+"%").Or("content LIKE ?", "%"+postQuery.SearchKey+"%").Order(order).Limit(postQuery.Limit).Offset(postQuery.Offset).Find(&posts)
 
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
@@ -575,7 +576,7 @@ func getPosts(c *gin.Context) {
 
 	//Get the count
 	var count int64
-	db.Table("posts").Count(&count)
+	db.Model(&models.Post{}).Where("title LIKE ?", "%"+postQuery.SearchKey+"%").Or("author LIKE ?", "%"+postQuery.SearchKey+"%").Or("content LIKE ?", "%"+postQuery.SearchKey+"%").Count(&count)
 
 	c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
 }
