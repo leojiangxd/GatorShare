@@ -118,18 +118,52 @@ func index(c *gin.Context) {
 //	@Router			/member [get]
 func getMembers(c *gin.Context) {
 
+	type MemberQuery struct {
+		Column    string `json:"column"`
+		Order     string `json:"order"`
+		Limit     int    `json:"limit"`
+		Offset    int    `json:"offset"`
+		SearchKey string `json:"search_key"`
+	}
+
+	//Start by reading in the sorting column and direction
+	var memberQuery MemberQuery
+	if err := c.ShouldBindJSON(&memberQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if memberQuery.Limit == 0 {
+		memberQuery.Limit = -1
+	}
+	if memberQuery.Offset == 0 {
+		memberQuery.Offset = -1
+	}
+
+	//Format the order for sorting
+	var order string
+	if memberQuery.Order != "" {
+		order = memberQuery.Column + " " + memberQuery.Order
+	} else {
+		order = memberQuery.Column
+	}
+
 	var members []models.Member
 
-	result := db.Limit(10).Find(&members)
+	// Fetch posts ordered by the passed in column, with slices specified
+	result := db.Where("username LIKE ?", "%"+memberQuery.SearchKey+"%").Or("email LIKE ?", "%"+memberQuery.SearchKey+"%").Or("bio LIKE ?", "%"+memberQuery.SearchKey+"%").Order(order).Limit(memberQuery.Limit).Offset(memberQuery.Offset).Find(&members)
 
-	checkErr(result.Error)
-
-	if members == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
 		return
-	} else {
-		c.JSON(http.StatusOK, gin.H{"data": members})
 	}
+
+	//Get the count
+	var count int64
+	db.Model(&models.Member{}).Where("username LIKE ?", "%"+memberQuery.SearchKey+"%").Or("email LIKE ?", "%"+memberQuery.SearchKey+"%").Or("bio LIKE ?", "%"+memberQuery.SearchKey+"%").Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": members})
 }
 
 // GetMemberByUsername godoc
