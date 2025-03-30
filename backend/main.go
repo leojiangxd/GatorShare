@@ -791,10 +791,10 @@ func updatePost(c *gin.Context) {
 		return
 	}
 
-	if post.Title == "" || post.Content == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
-		return
-	}
+	// if post.Title == "" || post.Content == "" {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
+	// 	return
+	// }
 
 	if post.Images == nil {
 		post.Images = models.StringArray{}
