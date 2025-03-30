@@ -16,6 +16,10 @@ type Member struct {
 	Bio          string `json:"bio"`
 	SessionToken string `json:"session_token"`
 	CSRFToken    string `json:"csrf_token"`
+
+	// Relationships
+	LikedPosts    []*Post `gorm:"many2many:member_likes;" json:"liked_posts"`
+	DislikedPosts []*Post `gorm:"many2many:member_dislikes;" json:"disliked_posts"`
 }
 
 type StringArray []string
@@ -47,6 +51,10 @@ type Post struct {
 	Views     int         `json:"views"`
 	Comments  []Comment   `json:"comments" gorm:"foreignKey:PostID;references:PostId"`
 	Images    StringArray `json:"images" gorm:"type:text"`
+
+	// Relationships
+	LikedByMembers    []*Member `gorm:"many2many:member_likes;" json:"liked_by_members"`
+	DislikedByMembers []*Member `gorm:"many2many:member_dislikes;" json:"disliked_by_members"`
 }
 
 type Comment struct {
