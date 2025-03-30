@@ -306,7 +306,7 @@ const User = () => {
               <PostCard key={post.post_id} post={post} preview={true} />
             ))
           ) : (
-            <p className="text-lg text-gray-500">No posts found</p>
+            <p className="text-lg text-accent-content">No posts found</p>
           )}
         </div>
       </div>

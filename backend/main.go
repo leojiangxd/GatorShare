@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -122,18 +123,44 @@ func index(c *gin.Context) {
 //	@Router			/member [get]
 func getMembers(c *gin.Context) {
 
+	//Start by reading in the sorting column and direction
+	var memberQuery models.SearchQuery
+	if err := c.ShouldBindJSON(&memberQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if memberQuery.Limit == 0 {
+		memberQuery.Limit = -1
+	}
+	if memberQuery.Offset == 0 {
+		memberQuery.Offset = -1
+	}
+
+	//Format the order for sorting
+	var order string
+	if memberQuery.Order != "" {
+		order = memberQuery.Column + " " + memberQuery.Order
+	} else {
+		order = memberQuery.Column
+	}
+
 	var members []models.Member
 
-	result := db.Limit(10).Find(&members)
+	// Fetch posts ordered by the passed in column, with slices specified
+	result := db.Where("username LIKE ?", "%"+memberQuery.SearchKey+"%").Or("email LIKE ?", "%"+memberQuery.SearchKey+"%").Or("bio LIKE ?", "%"+memberQuery.SearchKey+"%").Order(order).Limit(memberQuery.Limit).Offset(memberQuery.Offset).Find(&members)
 
-	checkErr(result.Error)
-
-	if members == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
 		return
-	} else {
-		c.JSON(http.StatusOK, gin.H{"data": members})
 	}
+
+	//Get the count
+	var count int64
+	db.Model(&models.Member{}).Where("username LIKE ?", "%"+memberQuery.SearchKey+"%").Or("email LIKE ?", "%"+memberQuery.SearchKey+"%").Or("bio LIKE ?", "%"+memberQuery.SearchKey+"%").Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": members})
 }
 
 // GetMemberByUsername godoc
@@ -548,17 +575,71 @@ func getUserLikedPosts(c *gin.Context) {
 // @Failure 		400 {object} string "Bad Request"
 // @Router 			/post [get]
 func getPosts(c *gin.Context) {
-	var posts []models.Post
 
-	// Fetch posts ordered by createdAt descending (latest first)
-	result := db.Preload("Comments").Order("created_at desc").Find(&posts)
-
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+	//Start by reading in the sorting column and direction
+	var postQuery models.SearchQuery
+	if err := c.ShouldBindQuery(&postQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": posts})
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if postQuery.Limit == 0 {
+		postQuery.Limit = -1
+	}
+	if postQuery.Offset == 0 {
+		postQuery.Offset = -1
+	}
+
+	//Format the order for sorting
+	var order string
+	if postQuery.Order != "" {
+		order = postQuery.Column + " " + postQuery.Order
+	} else {
+		order = postQuery.Column
+	}
+
+	var posts []models.Post
+
+	// Fetch posts ordered by the passed in column, with slices specified
+	if postQuery.Column == "comments" {
+		result := db.Preload("Comments").
+			Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+			Order(fmt.Sprintf("(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.post_id) %s", postQuery.Order)).
+			Limit(postQuery.Limit).
+			Offset(postQuery.Offset).
+			Find(&posts)
+
+		if result.Error != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+			return
+		}
+	} else {
+		result := db.Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+			Order(order).
+			Limit(postQuery.Limit).
+			Offset(postQuery.Offset).
+			Find(&posts)
+
+		if result.Error != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+			return
+		}
+	}
+
+	//Get the count
+	var count int64
+	db.Model(&models.Post{}).
+		Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+		Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+		Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+		Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
 }
 
 // GetPostById godoc
@@ -710,10 +791,10 @@ func updatePost(c *gin.Context) {
 		return
 	}
 
-	// if post.Title == "" || post.Content == "" {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
-	// 	return
-	// }
+	if post.Title == "" || post.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
+		return
+	}
 
 	if post.Images == nil {
 		post.Images = models.StringArray{}

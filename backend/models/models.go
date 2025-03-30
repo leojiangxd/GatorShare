@@ -66,3 +66,11 @@ type Comment struct {
 	Likes     int    `json:"likes"`
 	Dislikes  int    `json:"dislikes"`
 }
+
+type SearchQuery struct {
+	Column    string `form:"column"`
+	Order     string `form:"order"`
+	Limit     int    `form:"limit"`
+	Offset    int    `form:"offset"`
+	SearchKey string `form:"search_key"`
+}
