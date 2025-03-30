@@ -59,14 +59,21 @@ const User = () => {
       <NavBar />
       <div className="p-10 overflow-y-auto flex-grow flex flex-col items-center">
         <div className="flex gap-1 mb-10">
-          <details className="dropdown">
-            <summary className="btn bg-accent-content m-1">
+          <div className="dropdown dropdown-end">
+            <div
+              tabIndex={0}
+              role="button"
+              className="btn bg-accent-content m-1"
+            >
               {column === "created_at"
                 ? "Created At"
                 : column.charAt(0).toUpperCase() + column.slice(1)}
               <ChevronDown className="w-[1em]" />
-            </summary>
-            <ul className="menu dropdown-content bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm">
+            </div>
+            <ul
+              tabIndex={0}
+              className="menu dropdown-content bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
+            >
               <li>
                 <a onClick={() => setColumn("created_at")}>Created At</a>
               </li>
@@ -83,13 +90,21 @@ const User = () => {
                 <a onClick={() => setColumn("comments")}>Comments</a>
               </li>
             </ul>
-          </details>
-          <details className="dropdown">
-            <summary className="btn bg-accent-content m-1">
+          </div>
+
+          <div className="dropdown dropdown-end">
+            <div
+              tabIndex={0}
+              role="button"
+              className="btn bg-accent-content m-1"
+            >
               {order === "DESC" ? "Descending" : "Ascending"}
               <ChevronDown className="w-[1em]" />
-            </summary>
-            <ul className="menu dropdown-content bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm">
+            </div>
+            <ul
+              tabIndex={0}
+              className="menu dropdown-content bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
+            >
               <li>
                 <a onClick={() => setOrder("ASC")}>Ascending</a>
               </li>
@@ -97,7 +112,7 @@ const User = () => {
                 <a onClick={() => setOrder("DESC")}>Descending</a>
               </li>
             </ul>
-          </details>
+          </div>
         </div>
 
         {loading ? (
