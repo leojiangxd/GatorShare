@@ -15,6 +15,7 @@ const User = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const limit = 10;
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -23,7 +24,7 @@ const User = () => {
         params: {
           column,
           order,
-          limit: 10,
+          limit,
           offset: (page - 1) * 10,
           search_key: searchTerm || "",
         },
