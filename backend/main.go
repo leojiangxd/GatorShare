@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -567,53 +568,78 @@ func getCurrentUser(c *gin.Context) {
 // @Failure 		400 {object} string "Bad Request"
 // @Router 			/post [get]
 func getPosts(c *gin.Context) {
-
-	type PostQuery struct {
-		Column    string `json:"column"`
-		Order     string `json:"order"`
-		Limit     int    `json:"limit"`
-		Offset    int    `json:"offset"`
-		SearchKey string `json:"search_key"`
-	}
+    type PostQuery struct {
+        Column    string `form:"column"`
+        Order     string `form:"order"`
+        Limit     int    `form:"limit"`
+        Offset    int    `form:"offset"`
+        SearchKey string `form:"search_key"`
+    }
 
 	//Start by reading in the sorting column and direction
-	var postQuery PostQuery
-	if err := c.ShouldBindJSON(&postQuery); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    var postQuery PostQuery
+    if err := c.ShouldBindQuery(&postQuery); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	//If no limit or offset was passed in, set to -1 for the SQL command
-	if postQuery.Limit == 0 {
-		postQuery.Limit = -1
-	}
-	if postQuery.Offset == 0 {
-		postQuery.Offset = -1
-	}
+    //If no limit or offset was passed in, set to -1 for the SQL command
+    if postQuery.Limit == 0 {
+        postQuery.Limit = -1
+    }
+    if postQuery.Offset == 0 {
+        postQuery.Offset = -1
+    }
 
-	//Format the order for sorting
-	var order string
-	if postQuery.Order != "" {
-		order = postQuery.Column + " " + postQuery.Order
-	} else {
-		order = postQuery.Column
-	}
+    //Format the order for sorting
+    var order string
+    if postQuery.Order != "" {
+        order = postQuery.Column + " " + postQuery.Order
+    } else {
+        order = postQuery.Column
+    }
 
-	var posts []models.Post
+    var posts []models.Post
 
 	// Fetch posts ordered by the passed in column, with slices specified
-	result := db.Where("title LIKE ?", "%"+postQuery.SearchKey+"%").Or("author LIKE ?", "%"+postQuery.SearchKey+"%").Or("content LIKE ?", "%"+postQuery.SearchKey+"%").Order(order).Limit(postQuery.Limit).Offset(postQuery.Offset).Find(&posts)
+    if postQuery.Column == "comments" {
+        result := db.Preload("Comments").
+            Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+            Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+            Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+            Order(fmt.Sprintf("(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.post_id) %s", postQuery.Order)).
+            Limit(postQuery.Limit).
+            Offset(postQuery.Offset).
+            Find(&posts)
 
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
-		return
-	}
+        if result.Error != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+            return
+        }
+    } else {
+        result := db.Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+            Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+            Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+            Order(order).
+            Limit(postQuery.Limit).
+            Offset(postQuery.Offset).
+            Find(&posts)
 
-	//Get the count
-	var count int64
-	db.Model(&models.Post{}).Where("title LIKE ?", "%"+postQuery.SearchKey+"%").Or("author LIKE ?", "%"+postQuery.SearchKey+"%").Or("content LIKE ?", "%"+postQuery.SearchKey+"%").Count(&count)
+        if result.Error != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+            return
+        }
+    }
 
-	c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
+    //Get the count
+    var count int64
+    db.Model(&models.Post{}).
+        Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+        Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+        Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+        Count(&count)
+
+    c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
 }
 
 // GetPostById godoc
