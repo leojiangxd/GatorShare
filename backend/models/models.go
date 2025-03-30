@@ -58,3 +58,11 @@ type Comment struct {
 	Likes     int    `json:"likes"`
 	Dislikes  int    `json:"dislikes"`
 }
+
+type SearchQuery struct {
+	Column    string `json:"column"`
+	Order     string `json:"order"`
+	Limit     int    `json:"limit"`
+	Offset    int    `json:"offset"`
+	SearchKey string `json:"search_key"`
+}

@@ -120,16 +120,8 @@ func index(c *gin.Context) {
 //	@Router			/member [get]
 func getMembers(c *gin.Context) {
 
-	type MemberQuery struct {
-		Column    string `json:"column"`
-		Order     string `json:"order"`
-		Limit     int    `json:"limit"`
-		Offset    int    `json:"offset"`
-		SearchKey string `json:"search_key"`
-	}
-
 	//Start by reading in the sorting column and direction
-	var memberQuery MemberQuery
+	var memberQuery models.SearchQuery
 	if err := c.ShouldBindJSON(&memberQuery); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -568,78 +560,71 @@ func getCurrentUser(c *gin.Context) {
 // @Failure 		400 {object} string "Bad Request"
 // @Router 			/post [get]
 func getPosts(c *gin.Context) {
-    type PostQuery struct {
-        Column    string `form:"column"`
-        Order     string `form:"order"`
-        Limit     int    `form:"limit"`
-        Offset    int    `form:"offset"`
-        SearchKey string `form:"search_key"`
-    }
 
 	//Start by reading in the sorting column and direction
-    var postQuery PostQuery
-    if err := c.ShouldBindQuery(&postQuery); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	var postQuery models.SearchQuery
+	if err := c.ShouldBindQuery(&postQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    //If no limit or offset was passed in, set to -1 for the SQL command
-    if postQuery.Limit == 0 {
-        postQuery.Limit = -1
-    }
-    if postQuery.Offset == 0 {
-        postQuery.Offset = -1
-    }
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if postQuery.Limit == 0 {
+		postQuery.Limit = -1
+	}
+	if postQuery.Offset == 0 {
+		postQuery.Offset = -1
+	}
 
-    //Format the order for sorting
-    var order string
-    if postQuery.Order != "" {
-        order = postQuery.Column + " " + postQuery.Order
-    } else {
-        order = postQuery.Column
-    }
+	//Format the order for sorting
+	var order string
+	if postQuery.Order != "" {
+		order = postQuery.Column + " " + postQuery.Order
+	} else {
+		order = postQuery.Column
+	}
 
-    var posts []models.Post
+	var posts []models.Post
 
 	// Fetch posts ordered by the passed in column, with slices specified
-    if postQuery.Column == "comments" {
-        result := db.Preload("Comments").
-            Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
-            Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
-            Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
-            Order(fmt.Sprintf("(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.post_id) %s", postQuery.Order)).
-            Limit(postQuery.Limit).
-            Offset(postQuery.Offset).
-            Find(&posts)
+	if postQuery.Column == "comments" {
+		result := db.Preload("Comments").
+			Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+			Order(fmt.Sprintf("(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.post_id) %s", postQuery.Order)).
+			Limit(postQuery.Limit).
+			Offset(postQuery.Offset).
+			Find(&posts)
 
-        if result.Error != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
-            return
-        }
-    } else {
-        result := db.Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
-            Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
-            Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
-            Order(order).
-            Limit(postQuery.Limit).
-            Offset(postQuery.Offset).
-            Find(&posts)
+		if result.Error != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+			return
+		}
+	} else {
+		result := db.Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+			Order(order).
+			Limit(postQuery.Limit).
+			Offset(postQuery.Offset).
+			Find(&posts)
 
-        if result.Error != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
-            return
-        }
-    }
+		if result.Error != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+			return
+		}
+	}
 
-    //Get the count
-    var count int64
-    db.Model(&models.Post{}).
-        Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
-        Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
-        Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
-        Count(&count)
+	//Get the count
+	var count int64
+	db.Model(&models.Post{}).
+		Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+		Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+		Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+		Count(&count)
 
-    c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
 }
 
 // GetPostById godoc
@@ -769,50 +754,50 @@ func deletePost(c *gin.Context) {
 // @Failure 	403 {object} string "Forbidden"
 // @Router 		/post/{postId} [put]
 func updatePost(c *gin.Context) {
-    if err := Authorize(c); err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-        return
-    }
-    var post models.Post
-    if err := db.First(&post, "post_id = ?", c.Param("postId")).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
-        return
-    }
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var post models.Post
+	if err := db.First(&post, "post_id = ?", c.Param("postId")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		return
+	}
 
-    // Check if the post belongs to the logged-in user
-    username := getUsername(c)
-    if post.Author != username {
-        c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own posts"})
-        return
-    }
+	// Check if the post belongs to the logged-in user
+	username := getUsername(c)
+	if post.Author != username {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own posts"})
+		return
+	}
 
-    if err := c.ShouldBindJSON(&post); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	if err := c.ShouldBindJSON(&post); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    if post.Title == "" || post.Content == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
-        return
-    }
+	if post.Title == "" || post.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
+		return
+	}
 
-    if post.Images == nil {
-        post.Images = models.StringArray{}
-    }
+	if post.Images == nil {
+		post.Images = models.StringArray{}
+	}
 
-    // Update post with new title, content, and images
-    result := db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{
-        Title:   post.Title, 
-        Content: post.Content, 
-        Images:  post.Images,
-    })
+	// Update post with new title, content, and images
+	result := db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{
+		Title:   post.Title,
+		Content: post.Content,
+		Images:  post.Images,
+	})
 
-    if result.Error != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
-        return
-    }
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
+	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
 }
 
 // GetUserPosts godoc
@@ -965,51 +950,51 @@ func createComment(c *gin.Context) {
 }
 
 func updateComment(c *gin.Context) {
-    if err := Authorize(c); err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-        return
-    }
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
-    postId := c.Param("postId")
-    commentId := c.Param("commentId")
+	postId := c.Param("postId")
+	commentId := c.Param("commentId")
 
-    var comment models.Comment
-    if err := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
-        return
-    }
+	var comment models.Comment
+	if err := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
 
-    // Check if the comment belongs to the logged-in user
-    username := getUsername(c)
-    if comment.Author != username {
-        c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
-        return
-    }
+	// Check if the comment belongs to the logged-in user
+	username := getUsername(c)
+	if comment.Author != username {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
+		return
+	}
 
-    var updateData struct {
-        Content string `json:"content"`
-    }
+	var updateData struct {
+		Content string `json:"content"`
+	}
 
-    if err := c.ShouldBindJSON(&updateData); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    if updateData.Content == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Comment content cannot be empty"})
-        return
-    }
+	if updateData.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment content cannot be empty"})
+		return
+	}
 
-    comment.Content = updateData.Content
-    if err := db.Save(&comment).Error; err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment"})
-        return
-    }
+	comment.Content = updateData.Content
+	if err := db.Save(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment"})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{
-        "message": "Comment updated successfully", 
-        "data": comment,
-    })
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Comment updated successfully",
+		"data":    comment,
+	})
 }
 
 func deleteComment(c *gin.Context) {

@@ -106,14 +106,28 @@ func TestGetMembers(t *testing.T) {
 	checkErr(err)
 	r := SetUpRouter()
 
-	req, _ := http.NewRequest("GET", "/api/v1/member", nil)
+	userQuery := models.SearchQuery{
+		Limit:     10,
+		Offset:    1,
+		SearchKey: "test",
+	}
+
+	jsonValue, _ := json.Marshal(userQuery)
+	req, _ := http.NewRequest("GET", "/api/v1/member", bytes.NewBuffer(jsonValue))
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	response := w.Body.String()[8 : len(w.Body.String())-1]
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+	assert.Contains(t, w.Body.String(), "count")
 
-	assert.NotEmpty(t, response)
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	members := response["data"].([]interface{})
+	assert.NotEmpty(t, members)
+	count := response["count"]
+	assert.NotEmpty(t, count)
 }
 
 func TestGetMemberByUsername(t *testing.T) {
@@ -339,18 +353,27 @@ func TestGetPosts(t *testing.T) {
 	checkErr(err)
 	r := SetUpRouter()
 
-	req, _ := http.NewRequest("GET", "/api/v1/post", nil)
+	postQuery := models.SearchQuery{
+		Limit:     10,
+		SearchKey: "paul",
+	}
+
+	jsonValue, _ := json.Marshal(postQuery)
+	req, _ := http.NewRequest("GET", "/api/v1/post", bytes.NewBuffer(jsonValue))
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "data")
+	assert.Contains(t, w.Body.String(), "count")
 
 	var response map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &response)
 	posts := response["data"].([]interface{})
 	assert.NotEmpty(t, posts)
+	count := response["count"]
+	assert.NotEmpty(t, count)
 }
 
 func TestGetPostById(t *testing.T) {
