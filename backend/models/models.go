@@ -60,9 +60,9 @@ type Comment struct {
 }
 
 type SearchQuery struct {
-	Column    string `json:"column"`
-	Order     string `json:"order"`
-	Limit     int    `json:"limit"`
-	Offset    int    `json:"offset"`
-	SearchKey string `json:"search_key"`
+	Column    string `form:"column"`
+	Order     string `form:"order"`
+	Limit     int    `form:"limit"`
+	Offset    int    `form:"offset"`
+	SearchKey string `form:"search_key"`
 }
