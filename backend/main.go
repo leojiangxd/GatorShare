@@ -126,7 +126,7 @@ func getMembers(c *gin.Context) {
 
 	//Start by reading in the sorting column and direction
 	var memberQuery models.SearchQuery
-	if err := c.ShouldBindJSON(&memberQuery); err != nil {
+	if err := c.ShouldBindQuery(&memberQuery); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
