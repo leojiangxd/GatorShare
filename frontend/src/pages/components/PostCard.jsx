@@ -8,7 +8,7 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { formatTime, getCsrfToken } from "../../utils/functions";
+import { formatTime, getCsrfToken, getUsername } from "../../utils/functions";
 import axios from "axios";
 
 const PostCard = ({ post, preview = false }) => {
@@ -17,9 +17,42 @@ const PostCard = ({ post, preview = false }) => {
   const imageContainerRef = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
+  const [likes, setLikes] = useState(() => 0);
+  const [dislikes, setDislikes] = useState(() => 0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isDisliked, setIsDisliked] = useState(false);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const initalizeLikeDislike = async () => {
+      setLikes(post.likes ?? 0);
+      setDislikes(post.dislikes ?? 0);
+
+      const username = await getUsername();
+      if (!username) return;
+
+      const likeResponse = await axios.get(
+        `${apiBaseUrl}/api/v1/member/${username}/liked-posts`
+      );
+      if (likeResponse.data.data.some((likedPost) => likedPost.post_id === post.post_id)) {
+        setIsLiked(true);
+        setIsDisliked(false);
+        return;
+      }
+
+      const dislikeResponse = await axios.get(
+        `${apiBaseUrl}/api/v1/member/${username}/disliked-posts`
+      );
+      if (dislikeResponse.data.data.some((dislikedPost) => dislikedPost.post_id === post.post_id)) {
+        setIsDisliked(true);
+        setIsLiked(false);
+        return;
+      }
+    };
+    initalizeLikeDislike();
+  });
 
   // Scroll horizontally using vertical scroll
   useEffect(() => {
@@ -64,16 +97,78 @@ const PostCard = ({ post, preview = false }) => {
     };
   }, [modalOpen]);
 
-  const handleLike = (e) => {
+  const handleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    alert("liked post");
+
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      const postId = preview ? post.post_id : id;
+
+      const response = await axios.put(
+        `${apiBaseUrl}/api/v1/post/${postId}/like-dislike`,
+        { action: "like" },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      // Update the like/dislike counts from the response
+      setLikes(response.data.likes);
+      setDislikes(response.data.dislikes);
+      setIsLiked(!isLiked)
+    } catch (error) {
+      console.error(
+        "Error liking post:",
+        error.response ? error.response.data : error.message
+      );
+    }
   };
 
-  const handleDislike = (e) => {
+  const handleDislike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    alert("disliked post");
+
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      const postId = preview ? post.post_id : id;
+
+      const response = await axios.put(
+        `${apiBaseUrl}/api/v1/post/${postId}/like-dislike`,
+        { action: "dislike" },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      // Update the like/dislike counts from the response
+      setLikes(response.data.likes);
+      setDislikes(response.data.dislikes);
+      setIsDisliked(!isDisliked)
+    } catch (error) {
+      console.error(
+        "Error disliking post:",
+        error.response ? error.response.data : error.message
+      );
+    }
   };
 
   const navigateEdit = () => {
@@ -198,15 +293,22 @@ const PostCard = ({ post, preview = false }) => {
           </div>
           <button
             onClick={handleLike}
-            className="badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+            className={
+              isLiked
+                ? "badge badge-secondary hover:badge-primary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+            }
           >
-            <ThumbsUp className="w-[1em]" /> {post.likes}
+            <ThumbsUp className="w-[1em]" /> {likes}
           </button>
           <button
             onClick={handleDislike}
-            className="badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
-          >
-            <ThumbsDown className="w-[1em]" /> {post.dislikes}
+            className={
+              isDisliked
+                ? "badge badge-secondary hover:badge-primary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+            }          >
+            <ThumbsDown className="w-[1em]" /> {dislikes}
           </button>
         </div>
       </span>

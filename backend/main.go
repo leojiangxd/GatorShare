@@ -77,6 +77,7 @@ func main() {
 		v1.GET("current-user", getCurrentUser)
 
 		v1.GET("member/:username/liked-posts", getUserLikedPosts)
+		v1.GET("member/:username/disliked-posts", getUserDislikedPosts)
 
 		// post routes
 		v1.GET("post", getPosts)
@@ -564,6 +565,18 @@ func getUserLikedPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": member.LikedPosts})
 }
 
+func getUserDislikedPosts(c *gin.Context) {
+	username := c.Param("username")
+
+	var member models.Member
+	if err := db.Preload("DislikedPosts").First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": member.DislikedPosts})
+}
+
 // GetPosts godoc
 //
 // @Summary 		Retrieves all posts
@@ -916,36 +929,34 @@ func likeOrDislikePost(c *gin.Context) {
 	case "like":
 		// Check if the user already liked the post
 		if containsPost(member.LikedPosts, post.PostId) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Already liked"})
-			return
+			db.Model(&member).Association("LikedPosts").Delete(&post)
+			post.Likes--
+		} else {
+			// Remove from disliked posts if it exists there
+			if containsPost(member.DislikedPosts, post.PostId) {
+				db.Model(&member).Association("DislikedPosts").Delete(&post)
+				post.Dislikes--
+			}
+			// Add to liked posts and increment likes counter
+			db.Model(&member).Association("LikedPosts").Append(&post)
+			post.Likes++
 		}
-
-		// Remove from disliked posts if it exists there
-		if containsPost(member.DislikedPosts, post.PostId) {
-			db.Model(&member).Association("DislikedPosts").Delete(&post)
-			post.Dislikes--
-		}
-
-		// Add to liked posts and increment likes counter
-		db.Model(&member).Association("LikedPosts").Append(&post)
-		post.Likes++
 
 	case "dislike":
 		// Check if the user already disliked the post
 		if containsPost(member.DislikedPosts, post.PostId) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Already disliked"})
-			return
+			db.Model(&member).Association("DislikedPosts").Delete(&post)
+			post.Dislikes--
+		} else {
+			// Remove from liked posts if it exists there
+			if containsPost(member.LikedPosts, post.PostId) {
+				db.Model(&member).Association("LikedPosts").Delete(&post)
+				post.Likes--
+			}
+			// Add to disliked posts and increment dislikes counter
+			db.Model(&member).Association("DislikedPosts").Append(&post)
+			post.Dislikes++
 		}
-
-		// Remove from liked posts if it exists there
-		if containsPost(member.LikedPosts, post.PostId) {
-			db.Model(&member).Association("LikedPosts").Delete(&post)
-			post.Likes--
-		}
-
-		// Add to disliked posts and increment dislikes counter
-		db.Model(&member).Association("DislikedPosts").Append(&post)
-		post.Dislikes++
 
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action"})
