@@ -138,7 +138,7 @@ const docTemplate = `{
         },
         "/member": {
             "get": {
-                "description": "This API gets the first 10 Member entities from the database",
+                "description": "Gets a slice of members using the limit and offset parameters, sorts based on the column and order (desc or asc) parameters, and filters based off the search_key parameter",
                 "consumes": [
                     "application/json"
                 ],
@@ -148,7 +148,7 @@ const docTemplate = `{
                 "tags": [
                     "member"
                 ],
-                "summary": "Lists the first 10 members",
+                "summary": "Gets a list of members",
                 "responses": {
                     "200": {
                         "description": "Success",
@@ -363,7 +363,7 @@ const docTemplate = `{
         },
         "/post": {
             "get": {
-                "description": "This API fetches all posts from the database ordered by creation date",
+                "description": "Gets a slice of posts using the limit and offset parameters, sorts based on the column and order (desc or asc) parameters, and filters based off the search_key parameter",
                 "consumes": [
                     "application/json"
                 ],
@@ -373,7 +373,7 @@ const docTemplate = `{
                 "tags": [
                     "post"
                 ],
-                "summary": "Retrieves all posts",
+                "summary": "Retrieves posts",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -698,8 +698,21 @@ const docTemplate = `{
                 "csrf_token": {
                     "type": "string"
                 },
+                "disliked_posts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Post"
+                    }
+                },
                 "email": {
                     "type": "string"
+                },
+                "liked_posts": {
+                    "description": "Relationships",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Post"
+                    }
                 },
                 "password": {
                     "type": "string"
@@ -733,6 +746,12 @@ const docTemplate = `{
                 "createdAt": {
                     "type": "string"
                 },
+                "disliked_by_members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Member"
+                    }
+                },
                 "dislikes": {
                     "type": "integer"
                 },
@@ -740,6 +759,13 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                },
+                "liked_by_members": {
+                    "description": "Relationships",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Member"
                     }
                 },
                 "likes": {

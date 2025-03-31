@@ -114,8 +114,8 @@ func index(c *gin.Context) {
 
 // GetMembers godoc
 //
-//	@Summary		Lists the first 10 members
-//	@Description	This API gets the first 10 Member entities from the database
+//	@Summary		Gets a list of members
+//	@Description	Gets a slice of members using the limit and offset parameters, sorts based on the column and order (desc or asc) parameters, and filters based off the search_key parameter
 //	@Tags			member
 //	@Accept			json
 //	@Produce		json
@@ -579,8 +579,8 @@ func getUserDislikedPosts(c *gin.Context) {
 
 // GetPosts godoc
 //
-// @Summary 		Retrieves all posts
-// @Description 	This API fetches all posts from the database ordered by creation date
+// @Summary 		Retrieves posts
+// @Description 	Gets a slice of posts using the limit and offset parameters, sorts based on the column and order (desc or asc) parameters, and filters based off the search_key parameter
 // @Tags 			post
 // @Accept 			json
 // @Produce 		json
