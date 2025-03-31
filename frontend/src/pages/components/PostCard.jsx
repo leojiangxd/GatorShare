@@ -17,42 +17,53 @@ const PostCard = ({ post, preview = false }) => {
   const imageContainerRef = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
-  const [likes, setLikes] = useState(() => 0);
-  const [dislikes, setDislikes] = useState(() => 0);
+  const [likes, setLikes] = useState(post.likes || 0);
+  const [dislikes, setDislikes] = useState(post.dislikes || 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
+  const [ownPost, setOwnPost] = useState(false);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
 
   useEffect(() => {
-    const initalizeLikeDislike = async () => {
-      setLikes(post.likes ?? 0);
-      setDislikes(post.dislikes ?? 0);
+    if (!post?.post_id) return;
 
-      const username = await getUsername();
-      if (!username) return;
+    const initalizePost = async () => {
+      setLikes(post.likes || 0);
+      setDislikes(post.dislikes || 0);
 
-      const likeResponse = await axios.get(
-        `${apiBaseUrl}/api/v1/member/${username}/liked-posts`
-      );
-      if (likeResponse.data.data.some((likedPost) => likedPost.post_id === post.post_id)) {
-        setIsLiked(true);
-        setIsDisliked(false);
-        return;
-      }
+      try {
+        const username = await getUsername();
+        if (!username) return;
 
-      const dislikeResponse = await axios.get(
-        `${apiBaseUrl}/api/v1/member/${username}/disliked-posts`
-      );
-      if (dislikeResponse.data.data.some((dislikedPost) => dislikedPost.post_id === post.post_id)) {
-        setIsDisliked(true);
-        setIsLiked(false);
-        return;
+        if (username === post.author) {
+          setOwnPost(true);
+        }
+
+        const [likeResponse, dislikeResponse] = await Promise.all([
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/liked-posts`),
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/disliked-posts`),
+        ]);
+
+        setIsLiked(
+          likeResponse.data.data.some(
+            (likedPost) => likedPost.post_id === post.post_id
+          )
+        );
+
+        setIsDisliked(
+          dislikeResponse.data.data.some(
+            (dislikedPost) => dislikedPost.post_id === post.post_id
+          )
+        );
+      } catch (error) {
+        console.error("Error fetching like/dislike:", error);
       }
     };
-    initalizeLikeDislike();
-  });
+
+    initalizePost();
+  }, [post]);
 
   // Scroll horizontally using vertical scroll
   useEffect(() => {
@@ -125,7 +136,8 @@ const PostCard = ({ post, preview = false }) => {
       // Update the like/dislike counts from the response
       setLikes(response.data.likes);
       setDislikes(response.data.dislikes);
-      setIsLiked(!isLiked)
+      setIsLiked(!isLiked);
+      setIsDisliked(false);
     } catch (error) {
       console.error(
         "Error liking post:",
@@ -162,7 +174,8 @@ const PostCard = ({ post, preview = false }) => {
       // Update the like/dislike counts from the response
       setLikes(response.data.likes);
       setDislikes(response.data.dislikes);
-      setIsDisliked(!isDisliked)
+      setIsDisliked(!isDisliked);
+      setIsLiked(false);
     } catch (error) {
       console.error(
         "Error disliking post:",
@@ -260,7 +273,7 @@ const PostCard = ({ post, preview = false }) => {
             {post.author}
           </Link>
           <span className="opacity-50 ml-1">{formatTime(post.CreatedAt)}</span>
-          {!preview ? (
+          {!preview && ownPost ? (
             <div className="dropdown">
               <div
                 tabIndex={0}
@@ -295,7 +308,7 @@ const PostCard = ({ post, preview = false }) => {
             onClick={handleLike}
             className={
               isLiked
-                ? "badge badge-secondary hover:badge-primary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                ? "liked badge badge-secondary flex items-center cursor-pointer text-xs"
                 : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
             }
           >
@@ -305,9 +318,10 @@ const PostCard = ({ post, preview = false }) => {
             onClick={handleDislike}
             className={
               isDisliked
-                ? "badge badge-secondary hover:badge-primary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                ? "disliked badge badge-secondary flex items-center cursor-pointer text-xs"
                 : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
-            }          >
+            }
+          >
             <ThumbsDown className="w-[1em]" /> {dislikes}
           </button>
         </div>

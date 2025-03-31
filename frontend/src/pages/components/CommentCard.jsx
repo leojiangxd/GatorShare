@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { formatTime, getCsrfToken } from "../../utils/functions";
+import { formatTime, getCsrfToken, getUsername } from "../../utils/functions";
 import axios from "axios";
 
 const CommentCard = ({ comment }) => {
@@ -10,6 +10,19 @@ const CommentCard = ({ comment }) => {
   const { id } = useParams();
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
+  const [ownComment, setOwnComment] = useState(false);
+
+  useEffect(() => {
+    const initializeComment = async () => {
+      const username = await getUsername();
+      if (!username) return;
+      if (username === comment.author) {
+        setOwnComment(true);
+      }
+    };
+  
+    initializeComment();
+  }, [comment]); // Keep the correct dependency
 
   const handleLike = (e) => {
     e.preventDefault();
@@ -46,7 +59,7 @@ const CommentCard = ({ comment }) => {
       );
     }
   };
-  
+
   const handleEditSubmit = async () => {
     try {
       const csrfToken = getCsrfToken();
@@ -55,12 +68,12 @@ const CommentCard = ({ comment }) => {
         navigate("/login");
         return;
       }
-      
+
       if (editedContent.trim() === "") {
         handleDelete();
         return;
       }
-      
+
       const response = await axios.put(
         `${apiBaseUrl}/api/v1/comment/${id}/${comment.comment_id}`,
         { content: editedContent.trim() },
@@ -93,28 +106,32 @@ const CommentCard = ({ comment }) => {
               <span className="opacity-50 ml-1">
                 {formatTime(comment.CreatedAt)}
               </span>
-              <div className="dropdown">
-                <div
-                  tabIndex={0}
-                  role="button"
-                  className="rounded-full cursor-pointer"
-                >
-                  <ChevronDown className="h-[1em]" />
+              {ownComment ? (
+                <div className="dropdown">
+                  <div
+                    tabIndex={0}
+                    role="button"
+                    className="rounded-full cursor-pointer"
+                  >
+                    <ChevronDown className="h-[1em]" />
+                  </div>
+                  <ul
+                    tabIndex={0}
+                    className="dropdown-content menu bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
+                  >
+                    <li>
+                      <a onClick={() => setIsEditing(!isEditing)}>
+                        {isEditing ? "Cancel" : "Edit"}
+                      </a>
+                    </li>
+                    <li>
+                      <a onClick={handleDelete}>Delete</a>
+                    </li>
+                  </ul>
                 </div>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content menu bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
-                >
-                  <li>
-                    <a onClick={() => setIsEditing(!isEditing)}>
-                      {isEditing ? "Cancel" : "Edit"}
-                    </a>
-                  </li>
-                  <li>
-                    <a onClick={handleDelete}>Delete</a>
-                  </li>
-                </ul>
-              </div>
+              ) : (
+                <></>
+              )}
             </div>
             <div className="flex gap-2">
               <button
@@ -132,6 +149,7 @@ const CommentCard = ({ comment }) => {
             </div>
           </div>
         </div>
+
         {isEditing ? (
           <div className="flex flex-col gap-2">
             <input
