@@ -1,12 +1,12 @@
 import React from 'react'
-import User from './Home'
+import Home from './Home'
 import { MemoryRouter } from 'react-router-dom'
 
-describe('<User /> Front End', () => {
+describe('<Home /> Front End', () => {
   it('renders without crashing', () => {
     cy.mount(
       <MemoryRouter>
-        <User />
+        <Home />
       </MemoryRouter>
     )
     // Optionally, add frontend-specific assertions here.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -75,6 +76,9 @@ func main() {
 
 		v1.GET("current-user", getCurrentUser)
 
+		v1.GET("member/:username/liked-posts", getUserLikedPosts)
+		v1.GET("member/:username/disliked-posts", getUserDislikedPosts)
+
 		// post routes
 		v1.GET("post", getPosts)
 		v1.GET("post/:postId", getPostById)
@@ -83,11 +87,13 @@ func main() {
 		v1.PUT("post/:postId", updatePost)
 		v1.GET("member/:username/posts", getUserPosts)
 		v1.PUT("post/:postId/increment-views", incrementPostViews)
+		v1.PUT("post/:postId/like-dislike", likeOrDislikePost)
 
 		// comment routes
 		v1.GET("comment/:postId/", getComments)
 		v1.GET("comment/:postId/:commentId", getCommentById)
 		v1.POST("comment/:postId", createComment)
+		v1.PUT("comment/:postId/:commentId", updateComment)
 		v1.DELETE("comment/:postId/:commentId", deleteComment)
 
 	}
@@ -108,8 +114,8 @@ func index(c *gin.Context) {
 
 // GetMembers godoc
 //
-//	@Summary		Lists the first 10 members
-//	@Description	This API gets the first 10 Member entities from the database
+//	@Summary		Gets a list of members
+//	@Description	Gets a slice of members using the limit and offset parameters, sorts based on the column and order (desc or asc) parameters, and filters based off the search_key parameter
 //	@Tags			member
 //	@Accept			json
 //	@Produce		json
@@ -118,18 +124,44 @@ func index(c *gin.Context) {
 //	@Router			/member [get]
 func getMembers(c *gin.Context) {
 
+	//Start by reading in the sorting column and direction
+	var memberQuery models.SearchQuery
+	if err := c.ShouldBindQuery(&memberQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if memberQuery.Limit == 0 {
+		memberQuery.Limit = -1
+	}
+	if memberQuery.Offset == 0 {
+		memberQuery.Offset = -1
+	}
+
+	//Format the order for sorting
+	var order string
+	if memberQuery.Order != "" {
+		order = memberQuery.Column + " " + memberQuery.Order
+	} else {
+		order = memberQuery.Column
+	}
+
 	var members []models.Member
 
-	result := db.Limit(10).Find(&members)
+	// Fetch posts ordered by the passed in column, with slices specified
+	result := db.Where("username LIKE ?", "%"+memberQuery.SearchKey+"%").Or("email LIKE ?", "%"+memberQuery.SearchKey+"%").Or("bio LIKE ?", "%"+memberQuery.SearchKey+"%").Order(order).Limit(memberQuery.Limit).Offset(memberQuery.Offset).Find(&members)
 
-	checkErr(result.Error)
-
-	if members == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
 		return
-	} else {
-		c.JSON(http.StatusOK, gin.H{"data": members})
 	}
+
+	//Get the count
+	var count int64
+	db.Model(&models.Member{}).Where("username LIKE ?", "%"+memberQuery.SearchKey+"%").Or("email LIKE ?", "%"+memberQuery.SearchKey+"%").Or("bio LIKE ?", "%"+memberQuery.SearchKey+"%").Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": members})
 }
 
 // GetMemberByUsername godoc
@@ -186,11 +218,11 @@ func register(c *gin.Context) {
 		return
 	}
 
-		// Check if the email already exists
-		if err := db.Select("*").Where("email = ?", newMember.Email).First(&models.Member{}).Error; err == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Email already exists"})
-			return
-		}
+	// Check if the email already exists
+	if err := db.Select("*").Where("email = ?", newMember.Email).First(&models.Member{}).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already exists"})
+		return
+	}
 
 	//Hash the password using bcrypt
 	newMember.Password, _ = hashPassword(newMember.Password)
@@ -316,107 +348,107 @@ func logout(c *gin.Context) {
 //	@Failure 		404 {object} string "Not Found"
 //	@Router			/member [put]
 func updateMember(c *gin.Context) {
-    if err := Authorize(c); err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-        return
-    }
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
-    username := getUsername(c)
-    if username == "" {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-        return
-    }
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
-    type UpdateRequest struct {
-        CurrentPassword string `json:"currentPassword"`
-        NewUsername     string `json:"username"`
-        NewEmail        string `json:"email"`
-        NewPassword     string `json:"newPassword"`
-        Bio             string `json:"bio"`
-    }
+	type UpdateRequest struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewUsername     string `json:"username"`
+		NewEmail        string `json:"email"`
+		NewPassword     string `json:"newPassword"`
+		Bio             string `json:"bio"`
+	}
 
-    var updateReq UpdateRequest
-    if err := c.ShouldBindJSON(&updateReq); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	var updateReq UpdateRequest
+	if err := c.ShouldBindJSON(&updateReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    var currentMember models.Member
-    if err := db.First(&currentMember, "username = ?", username).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-        return
-    }
+	var currentMember models.Member
+	if err := db.First(&currentMember, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
 
-    if updateReq.NewUsername != "" && updateReq.NewUsername != username {
-        var existingUser models.Member
-        if err := db.First(&existingUser, "username = ?", updateReq.NewUsername).Error; err == nil {
-            c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
-            return
-        }
-    }
+	if updateReq.NewUsername != "" && updateReq.NewUsername != username {
+		var existingUser models.Member
+		if err := db.First(&existingUser, "username = ?", updateReq.NewUsername).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
+			return
+		}
+	}
 
-    if updateReq.NewEmail != "" && updateReq.NewEmail != currentMember.Email {
-        var existingUser models.Member
-        if err := db.First(&existingUser, "email = ?", updateReq.NewEmail).Error; err == nil {
-            c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
-            return
-        }
-    }
+	if updateReq.NewEmail != "" && updateReq.NewEmail != currentMember.Email {
+		var existingUser models.Member
+		if err := db.First(&existingUser, "email = ?", updateReq.NewEmail).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+			return
+		}
+	}
 
-    if updateReq.NewPassword != "" {
-        if updateReq.CurrentPassword == "" {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Enter your current password"})
-            return
-        }
-        if !checkPasswordHash(updateReq.CurrentPassword, currentMember.Password) {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
-            return
-        }
-        hashedNewPassword, _ := hashPassword(updateReq.NewPassword)
-        currentMember.Password = hashedNewPassword
-    }
+	if updateReq.NewPassword != "" {
+		if updateReq.CurrentPassword == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Enter your current password"})
+			return
+		}
+		if !checkPasswordHash(updateReq.CurrentPassword, currentMember.Password) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
+			return
+		}
+		hashedNewPassword, _ := hashPassword(updateReq.NewPassword)
+		currentMember.Password = hashedNewPassword
+	}
 
-    err := db.Transaction(func(tx *gorm.DB) error {
-        // Update username in posts and comments if changed
-        if updateReq.NewUsername != "" && updateReq.NewUsername != username {
-            // Update posts
-            if err := tx.Model(&models.Post{}).Where("author = ?", username).Update("author", updateReq.NewUsername).Error; err != nil {
-                return err
-            }
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// Update username in posts and comments if changed
+		if updateReq.NewUsername != "" && updateReq.NewUsername != username {
+			// Update posts
+			if err := tx.Model(&models.Post{}).Where("author = ?", username).Update("author", updateReq.NewUsername).Error; err != nil {
+				return err
+			}
 
-            // Update comments
-            if err := tx.Model(&models.Comment{}).Where("author = ?", username).Update("author", updateReq.NewUsername).Error; err != nil {
-                return err
-            }
+			// Update comments
+			if err := tx.Model(&models.Comment{}).Where("author = ?", username).Update("author", updateReq.NewUsername).Error; err != nil {
+				return err
+			}
 
-            // Update the current member's username
-            if err := tx.Model(&currentMember).Update("username", updateReq.NewUsername).Error; err != nil {
-                return err
-            }
-            username = updateReq.NewUsername // Update reference
-        }
+			// Update the current member's username
+			if err := tx.Model(&currentMember).Update("username", updateReq.NewUsername).Error; err != nil {
+				return err
+			}
+			username = updateReq.NewUsername // Update reference
+		}
 
-        if updateReq.NewEmail != "" {
-            currentMember.Email = updateReq.NewEmail
-        }
-        if updateReq.Bio != "" {
-            currentMember.Bio = updateReq.Bio
-        }
-        return tx.Save(&currentMember).Error
-    })
+		if updateReq.NewEmail != "" {
+			currentMember.Email = updateReq.NewEmail
+		}
+		if updateReq.Bio != "" {
+			currentMember.Bio = updateReq.Bio
+		}
+		return tx.Save(&currentMember).Error
+	})
 
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
-        return
-    }
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		return
+	}
 
-    responseData := gin.H{
-        "username": currentMember.Username,
-        "email":    currentMember.Email,
-        "bio":      currentMember.Bio,
-    }
+	responseData := gin.H{
+		"username": currentMember.Username,
+		"email":    currentMember.Email,
+		"bio":      currentMember.Bio,
+	}
 
-    c.JSON(http.StatusOK, gin.H{"data": responseData})
+	c.JSON(http.StatusOK, gin.H{"data": responseData})
 }
 
 // DeleteMember godoc
@@ -432,50 +464,50 @@ func updateMember(c *gin.Context) {
 //	@Failure 		404 {object} string "Not Found"
 //	@Router			/member [delete]
 func deleteMember(c *gin.Context) {
-    // Check if user is logged in
-    if err := Authorize(c); err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": err})
-        return
-    }
+	// Check if user is logged in
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err})
+		return
+	}
 
-    username := getUsername(c)
-    if username == "" {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-        return
-    }
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
-    var member models.Member
-    if err := db.First(&member, "username = ?", username).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
-        return
-    }
+	var member models.Member
+	if err := db.First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
 
-    // Start a transaction to ensure all updates happen atomically
-    err := db.Transaction(func(tx *gorm.DB) error {
-        // Update posts to mark author as [deleted]
-        if err := tx.Model(&models.Post{}).Where("author = ?", username).Update("author", "[deleted]").Error; err != nil {
-            return err
-        }
+	// Start a transaction to ensure all updates happen atomically
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// Update posts to mark author as [deleted]
+		if err := tx.Model(&models.Post{}).Where("author = ?", username).Update("author", "[deleted]").Error; err != nil {
+			return err
+		}
 
-        // Update comments to mark author as [deleted]
-        if err := tx.Model(&models.Comment{}).Where("author = ?", username).Update("author", "[deleted]").Error; err != nil {
-            return err
-        }
+		// Update comments to mark author as [deleted]
+		if err := tx.Model(&models.Comment{}).Where("author = ?", username).Update("author", "[deleted]").Error; err != nil {
+			return err
+		}
 
-        // Delete the member
-        if err := tx.Delete(&member).Error; err != nil {
-            return err
-        }
+		// Delete the member
+		if err := tx.Delete(&member).Error; err != nil {
+			return err
+		}
 
-        return nil
-    })
+		return nil
+	})
 
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete member"})
-        return
-    }
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete member"})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"message": "Member deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Member deleted successfully"})
 }
 
 // Options godoc
@@ -521,10 +553,34 @@ func getCurrentUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"username": username})
 }
 
+func getUserLikedPosts(c *gin.Context) {
+	username := c.Param("username")
+
+	var member models.Member
+	if err := db.Preload("LikedPosts").First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": member.LikedPosts})
+}
+
+func getUserDislikedPosts(c *gin.Context) {
+	username := c.Param("username")
+
+	var member models.Member
+	if err := db.Preload("DislikedPosts").First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": member.DislikedPosts})
+}
+
 // GetPosts godoc
 //
-// @Summary 		Retrieves all posts
-// @Description 	This API fetches all posts from the database ordered by creation date
+// @Summary 		Retrieves posts
+// @Description 	Gets a slice of posts using the limit and offset parameters, sorts based on the column and order (desc or asc) parameters, and filters based off the search_key parameter
 // @Tags 			post
 // @Accept 			json
 // @Produce 		json
@@ -532,17 +588,71 @@ func getCurrentUser(c *gin.Context) {
 // @Failure 		400 {object} string "Bad Request"
 // @Router 			/post [get]
 func getPosts(c *gin.Context) {
-	var posts []models.Post
 
-	// Fetch posts ordered by createdAt descending (latest first)
-	result := db.Preload("Comments").Order("created_at desc").Find(&posts)
-
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+	//Start by reading in the sorting column and direction
+	var postQuery models.SearchQuery
+	if err := c.ShouldBindQuery(&postQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": posts})
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if postQuery.Limit == 0 {
+		postQuery.Limit = -1
+	}
+	if postQuery.Offset == 0 {
+		postQuery.Offset = -1
+	}
+
+	//Format the order for sorting
+	var order string
+	if postQuery.Order != "" {
+		order = postQuery.Column + " " + postQuery.Order
+	} else {
+		order = postQuery.Column
+	}
+
+	var posts []models.Post
+
+	// Fetch posts ordered by the passed in column, with slices specified
+	if postQuery.Column == "comments" {
+		result := db.Preload("Comments").
+			Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+			Order(fmt.Sprintf("(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.post_id) %s", postQuery.Order)).
+			Limit(postQuery.Limit).
+			Offset(postQuery.Offset).
+			Find(&posts)
+
+		if result.Error != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+			return
+		}
+	} else {
+		result := db.Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+			Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+			Order(order).
+			Limit(postQuery.Limit).
+			Offset(postQuery.Offset).
+			Find(&posts)
+
+		if result.Error != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+			return
+		}
+	}
+
+	//Get the count
+	var count int64
+	db.Model(&models.Post{}).
+		Where("title LIKE ?", "%"+postQuery.SearchKey+"%").
+		Or("author LIKE ?", "%"+postQuery.SearchKey+"%").
+		Or("content LIKE ?", "%"+postQuery.SearchKey+"%").
+		Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": posts})
 }
 
 // GetPostById godoc
@@ -676,7 +786,6 @@ func updatePost(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-
 	var post models.Post
 	if err := db.First(&post, "post_id = ?", c.Param("postId")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
@@ -695,7 +804,27 @@ func updatePost(c *gin.Context) {
 		return
 	}
 
-	db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{Title: post.Title, Content: post.Content})
+	// if post.Title == "" || post.Content == "" {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Title and Content is required"})
+	// 	return
+	// }
+
+	if post.Images == nil {
+		post.Images = models.StringArray{}
+	}
+
+	// Update post with new title, content, and images
+	result := db.Model(&post).Where("post_id = ?", c.Param("postId")).Updates(models.Post{
+		Title:   post.Title,
+		Content: post.Content,
+		Images:  post.Images,
+	})
+
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "data": post})
 }
 
@@ -756,6 +885,105 @@ func incrementPostViews(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "View count incremented", "views": post.Views})
+}
+
+func likeOrDislikePost(c *gin.Context) {
+	// Check if the user is authorized
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	postId := c.Param("postId")
+	var post models.Post
+
+	// Fetch the post by ID
+	if err := db.First(&post, "post_id = ?", postId).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		return
+	}
+
+	// Parse the request body to determine the action (like or dislike)
+	var request struct {
+		Action string `json:"action"` // "like" or "dislike"
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var member models.Member
+	// Fetch the member and preload their liked/disliked posts
+	if err := db.Preload("LikedPosts").Preload("DislikedPosts").First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	switch request.Action {
+	case "like":
+		// Check if the user already liked the post
+		if containsPost(member.LikedPosts, post.PostId) {
+			db.Model(&member).Association("LikedPosts").Delete(&post)
+			post.Likes--
+		} else {
+			// Remove from disliked posts if it exists there
+			if containsPost(member.DislikedPosts, post.PostId) {
+				db.Model(&member).Association("DislikedPosts").Delete(&post)
+				post.Dislikes--
+			}
+			// Add to liked posts and increment likes counter
+			db.Model(&member).Association("LikedPosts").Append(&post)
+			post.Likes++
+		}
+
+	case "dislike":
+		// Check if the user already disliked the post
+		if containsPost(member.DislikedPosts, post.PostId) {
+			db.Model(&member).Association("DislikedPosts").Delete(&post)
+			post.Dislikes--
+		} else {
+			// Remove from liked posts if it exists there
+			if containsPost(member.LikedPosts, post.PostId) {
+				db.Model(&member).Association("LikedPosts").Delete(&post)
+				post.Likes--
+			}
+			// Add to disliked posts and increment dislikes counter
+			db.Model(&member).Association("DislikedPosts").Append(&post)
+			post.Dislikes++
+		}
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action"})
+		return
+	}
+
+	// Save the updated post to update likes/dislikes counters in the database
+	if err := db.Save(&post).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update post"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Action applied successfully",
+		"likes":    post.Likes,
+		"dislikes": post.Dislikes,
+	})
+}
+
+// Helper function to check if a post is in a list of posts
+func containsPost(posts []*models.Post, postId string) bool {
+	for _, p := range posts {
+		if p.PostId == postId {
+			return true
+		}
+	}
+	return false
 }
 
 func getComments(c *gin.Context) {
@@ -846,6 +1074,54 @@ func createComment(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, gin.H{"message": "Comment created successfully", "data": newComment})
 	}
+}
+
+func updateComment(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	postId := c.Param("postId")
+	commentId := c.Param("commentId")
+
+	var comment models.Comment
+	if err := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	// Check if the comment belongs to the logged-in user
+	username := getUsername(c)
+	if comment.Author != username {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
+		return
+	}
+
+	var updateData struct {
+		Content string `json:"content"`
+	}
+
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if updateData.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment content cannot be empty"})
+		return
+	}
+
+	comment.Content = updateData.Content
+	if err := db.Save(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Comment updated successfully",
+		"data":    comment,
+	})
 }
 
 func deleteComment(c *gin.Context) {

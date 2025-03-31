@@ -6,7 +6,7 @@ import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { getCsrfToken, getUsername } from "../utils/functions";
 import axios from "axios";
 
-const User = () => {
+const Home = () => {
   const navigate = useNavigate();
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   
@@ -95,7 +95,8 @@ const User = () => {
         },
         withCredentials: true,
       });
-      navigate(`/user/${username}`)
+      navigate(`/user/${username}`);
+      setIsEditing(false);
     } catch (error) {
       console.error("Error updating profile:", error.response ? error.response.data : error.message);
       alert(`Failed to update profile:\n${error.response ? error.response.data.error : error.message}`);
@@ -371,7 +372,7 @@ const User = () => {
               <PostCard key={post.post_id} post={post} preview={true} />
             ))
           ) : (
-            <p className="text-lg text-gray-500">No posts found</p>
+            <p className="text-lg text-accent-content">No posts found</p>
           )}
         </div>
       </div>
@@ -379,4 +380,4 @@ const User = () => {
   );
 };
 
-export default User;
+export default Home;

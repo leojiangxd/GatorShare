@@ -25,8 +25,17 @@ definitions:
         type: string
       csrf_token:
         type: string
+      disliked_posts:
+        items:
+          $ref: '#/definitions/models.Post'
+        type: array
       email:
         type: string
+      liked_posts:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.Post'
+        type: array
       password:
         type: string
       session_token:
@@ -48,11 +57,20 @@ definitions:
         type: string
       createdAt:
         type: string
+      disliked_by_members:
+        items:
+          $ref: '#/definitions/models.Member'
+        type: array
       dislikes:
         type: integer
       images:
         items:
           type: string
+        type: array
+      liked_by_members:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.Member'
         type: array
       likes:
         type: integer
@@ -185,7 +203,9 @@ paths:
     get:
       consumes:
       - application/json
-      description: This API gets the first 10 Member entities from the database
+      description: Gets a slice of members using the limit and offset parameters,
+        sorts based on the column and order (desc or asc) parameters, and filters
+        based off the search_key parameter
       produces:
       - application/json
       responses:
@@ -197,7 +217,7 @@ paths:
           description: Bad Request
           schema:
             type: string
-      summary: Lists the first 10 members
+      summary: Gets a list of members
       tags:
       - member
     options:
@@ -304,8 +324,9 @@ paths:
     get:
       consumes:
       - application/json
-      description: This API fetches all posts from the database ordered by creation
-        date
+      description: Gets a slice of posts using the limit and offset parameters, sorts
+        based on the column and order (desc or asc) parameters, and filters based
+        off the search_key parameter
       produces:
       - application/json
       responses:
@@ -319,7 +340,7 @@ paths:
           description: Bad Request
           schema:
             type: string
-      summary: Retrieves all posts
+      summary: Retrieves posts
       tags:
       - post
     post:

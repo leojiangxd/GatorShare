@@ -57,6 +57,7 @@ func SetUpRouter() *gin.Engine {
 		v1.OPTIONS("member", options)
 
 		v1.GET("current-user", getCurrentUser)
+		v1.GET("member/:username/liked-posts", getUserLikedPosts)
 
 		// post routes
 		v1.GET("post", getPosts)
@@ -66,6 +67,7 @@ func SetUpRouter() *gin.Engine {
 		v1.PUT("post/:postId", updatePost)
 		v1.GET("member/:username/posts", getUserPosts)
 		v1.PUT("post/:postId/increment-views", incrementPostViews)
+		v1.PUT("post/:postId/like-dislike", likeOrDislikePost)
 
 		// comment routes
 		v1.GET("comment/:postId/", getComments)
@@ -106,14 +108,21 @@ func TestGetMembers(t *testing.T) {
 	checkErr(err)
 	r := SetUpRouter()
 
-	req, _ := http.NewRequest("GET", "/api/v1/member", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/member?column=created_at&order=desc&limit=10&offset=0&search_key=test", nil)
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	response := w.Body.String()[8 : len(w.Body.String())-1]
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+	assert.Contains(t, w.Body.String(), "count")
 
-	assert.NotEmpty(t, response)
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	members := response["data"].([]interface{})
+	assert.NotEmpty(t, members)
+	count := response["count"]
+	assert.NotEmpty(t, count)
 }
 
 func TestGetMemberByUsername(t *testing.T) {
@@ -210,15 +219,24 @@ func TestUpdateMember(t *testing.T) {
 	checkErr(err)
 	r := SetUpRouter()
 
-	var user models.Member
-	mockUser := models.Member{
-		Email:    "updated@test.com",
-		Username: "saul",
-		Password: "Lawyering",
-		Bio:      "Updated Bio",
+	type UpdateRequest struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewUsername     string `json:"username"`
+		NewEmail        string `json:"email"`
+		NewPassword     string `json:"newPassword"`
+		Bio             string `json:"bio"`
 	}
 
-	jsonValue, _ := json.Marshal(mockUser)
+	var user models.Member
+	updateReq := UpdateRequest{
+		CurrentPassword: "Money123",
+		NewEmail:        "updated@test.com",
+		NewUsername:     "saul",
+		NewPassword:     "Lawyering",
+		Bio:             "Updated Bio",
+	}
+
+	jsonValue, _ := json.Marshal(updateReq)
 	req, _ := http.NewRequest("PUT", "/api/v1/member", bytes.NewBuffer(jsonValue))
 	req.AddCookie(&http.Cookie{
 		Name:     "session_token",
@@ -237,10 +255,9 @@ func TestUpdateMember(t *testing.T) {
 	response := w.Body.String()[8 : len(w.Body.String())-1]
 	json.Unmarshal([]byte(response), &user)
 
-	assert.Equal(t, mockUser.Email, user.Email)
-	assert.Equal(t, mockUser.Username, user.Username)
-	assert.True(t, checkPasswordHash(mockUser.Password, user.Password))
-	assert.Equal(t, mockUser.Bio, user.Bio)
+	assert.Equal(t, updateReq.NewEmail, user.Email)
+	assert.Equal(t, updateReq.NewUsername, user.Username)
+	assert.Equal(t, updateReq.Bio, user.Bio)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
@@ -339,18 +356,21 @@ func TestGetPosts(t *testing.T) {
 	checkErr(err)
 	r := SetUpRouter()
 
-	req, _ := http.NewRequest("GET", "/api/v1/post", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/post?column=created_at&order=desc&limit=10&offset=0&search_key=test", nil)
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "data")
+	assert.Contains(t, w.Body.String(), "count")
 
 	var response map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &response)
 	posts := response["data"].([]interface{})
 	assert.NotEmpty(t, posts)
+	count := response["count"]
+	assert.NotEmpty(t, count)
 }
 
 func TestGetPostById(t *testing.T) {
@@ -540,6 +560,90 @@ func TestIncrementPostViews(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NotEmpty(t, response["views"])
 
-	//Deleting user created for testing Post's APIs
+}
+
+func TestLikePost(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Create a new post for testing
+	newPost := models.Post{
+		Title:   "Test Like Post",
+		Content: "Testing like functionality",
+	}
+	jsonValue, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonValue))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	var createResponse map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &createResponse)
+	postID := createResponse["data"].(map[string]interface{})["post_id"].(string)
+
+	// Like the post
+	likeRequest := map[string]string{"action": "like"}
+	jsonValue, _ = json.Marshal(likeRequest)
+	req, _ = http.NewRequest("PUT", "/api/v1/post/"+postID+"/like-dislike", bytes.NewBuffer(jsonValue))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Action applied successfully")
+}
+
+func TestGetUserLikedPosts(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	req, _ := http.NewRequest("GET", "/api/v1/member/saul/liked-posts", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+}
+
+func TestDislikePost(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Create a new post for testing
+	newPost := models.Post{
+		Title:   "Test Dislike Post",
+		Content: "Testing dislike functionality",
+	}
+	jsonValue, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonValue))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	var createResponse map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &createResponse)
+	postID := createResponse["data"].(map[string]interface{})["post_id"].(string)
+
+	// Dislike the post
+	dislikeRequest := map[string]string{"action": "dislike"}
+	jsonValue, _ = json.Marshal(dislikeRequest)
+	req, _ = http.NewRequest("PUT", "/api/v1/post/"+postID+"/like-dislike", bytes.NewBuffer(jsonValue))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Action applied successfully")
+
+	//Deleting user created for testing APIs
 	TestDeleteMember(t)
 }

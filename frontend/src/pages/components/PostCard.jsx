@@ -1,18 +1,69 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, MessageSquare, Send, ThumbsDown, ThumbsUp } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { formatTime, getCsrfToken } from "../../utils/functions";
-import axios from 'axios';
-
+import {
+  ChevronDown,
+  Eye,
+  MessageSquare,
+  Send,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { formatTime, getCsrfToken, getUsername } from "../../utils/functions";
+import axios from "axios";
 
 const PostCard = ({ post, preview = false }) => {
+  const { id } = useParams();
   const [comment, setComment] = useState("");
   const imageContainerRef = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
+  const [likes, setLikes] = useState(post.likes || 0);
+  const [dislikes, setDislikes] = useState(post.dislikes || 0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isDisliked, setIsDisliked] = useState(false);
+  const [ownPost, setOwnPost] = useState(false);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!post?.post_id) return;
+
+    const initalizePost = async () => {
+      setLikes(post.likes || 0);
+      setDislikes(post.dislikes || 0);
+
+      try {
+        const username = await getUsername();
+        if (!username) return;
+
+        if (username === post.author) {
+          setOwnPost(true);
+        }
+
+        const [likeResponse, dislikeResponse] = await Promise.all([
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/liked-posts`),
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/disliked-posts`),
+        ]);
+
+        setIsLiked(
+          likeResponse.data.data.some(
+            (likedPost) => likedPost.post_id === post.post_id
+          )
+        );
+
+        setIsDisliked(
+          dislikeResponse.data.data.some(
+            (dislikedPost) => dislikedPost.post_id === post.post_id
+          )
+        );
+      } catch (error) {
+        console.error("Error fetching like/dislike:", error);
+      }
+    };
+
+    initalizePost();
+  }, [post]);
 
   // Scroll horizontally using vertical scroll
   useEffect(() => {
@@ -57,34 +108,23 @@ const PostCard = ({ post, preview = false }) => {
     };
   }, [modalOpen]);
 
-  const handleLike = (e) => {
+  const handleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    alert("liked post");
-  };
 
-  const handleDislike = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    alert("disliked post");
-  };
-
-  const handleSendComment = async () => {
-    if (comment.trim() == "")
-      return;
-    const csrfToken = getCsrfToken();
-    
-    if (!csrfToken) {
-      console.error("CSRF token is missing.");
-      navigate("/login");
-      return;
-    }
-  
     try {
-      console.log(comment)
-      await axios.post(
-        `${apiBaseUrl}/api/v1/comment/${post.post_id}`,
-        { content : comment.trim() },
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      const postId = preview ? post.post_id : id;
+
+      const response = await axios.put(
+        `${apiBaseUrl}/api/v1/post/${postId}/like-dislike`,
+        { action: "like" },
         {
           headers: {
             "X-CSRF-Token": csrfToken || "",
@@ -92,14 +132,120 @@ const PostCard = ({ post, preview = false }) => {
           withCredentials: true,
         }
       );
-      window.location.reload()
+
+      // Update the like/dislike counts from the response
+      setLikes(response.data.likes);
+      setDislikes(response.data.dislikes);
+      setIsLiked(!isLiked);
+      setIsDisliked(false);
     } catch (error) {
-      console.error("Error sending comment:", error.response ? error.response.data : error.message);
+      console.error(
+        "Error liking post:",
+        error.response ? error.response.data : error.message
+      );
     }
   };
-  
+
+  const handleDislike = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      const postId = preview ? post.post_id : id;
+
+      const response = await axios.put(
+        `${apiBaseUrl}/api/v1/post/${postId}/like-dislike`,
+        { action: "dislike" },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      // Update the like/dislike counts from the response
+      setLikes(response.data.likes);
+      setDislikes(response.data.dislikes);
+      setIsDisliked(!isDisliked);
+      setIsLiked(false);
+    } catch (error) {
+      console.error(
+        "Error disliking post:",
+        error.response ? error.response.data : error.message
+      );
+    }
+  };
+
+  const navigateEdit = () => {
+    navigate(`/edit/post/${id}`);
+  };
+
+  const handleDelete = async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+      await axios.delete(`${apiBaseUrl}/api/v1/post/${id}`, {
+        headers: {
+          "X-CSRF-Token": csrfToken || "",
+        },
+        withCredentials: true,
+      });
+      navigate("/");
+    } catch (error) {
+      console.error(
+        "Error deleting :",
+        error.response ? error.response.data : error.message
+      );
+    }
+  };
+
+  const handleSendComment = async () => {
+    if (comment.trim() == "") return;
+    const csrfToken = getCsrfToken();
+
+    if (!csrfToken) {
+      console.error("CSRF token is missing.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      console.log(comment);
+      await axios.post(
+        `${apiBaseUrl}/api/v1/comment/${post.post_id}`,
+        { content: comment.trim() },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+      window.location.reload();
+    } catch (error) {
+      console.error(
+        "Error sending comment:",
+        error.response ? error.response.data : error.message
+      );
+    }
+  };
+
   const incrementViewCount = async () => {
-    await axios.put(`${apiBaseUrl}/api/v1/post/${post.post_id}/increment-views`)
+    await axios.put(
+      `${apiBaseUrl}/api/v1/post/${post.post_id}/increment-views`
+    );
   };
 
   const handleImageClick = (e, image) => {
@@ -121,13 +267,34 @@ const PostCard = ({ post, preview = false }) => {
 
   const cardContent = (
     <>
-      <h2 className="card-title">{post.title}</h2>
       <span className="text-xs flex flex-wrap">
         <div className="flex flex-auto items-center">
           <Link to={`/user/${post.author}`} className="hover:underline">
             {post.author}
           </Link>
           <span className="opacity-50 ml-1">{formatTime(post.CreatedAt)}</span>
+          {!preview && ownPost ? (
+            <div className="dropdown">
+              <div
+                tabIndex={0}
+                role="button"
+                className="rounded-full cursor-pointer"
+              >
+                <ChevronDown className="h-[1em]" />
+              </div>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu bg-accent-content rounded-box z-1 w-52 p-2 shadow-sm"
+              >
+                <li>
+                  <a onClick={navigateEdit}>Edit</a>
+                </li>
+                <li>
+                  <a onClick={handleDelete}>Delete</a>
+                </li>
+              </ul>
+            </div>
+          ) : null}
         </div>
         <div className="card-actions flex items-center pt-2">
           <div className="badge badge-ghost flex text-xs">
@@ -139,18 +306,27 @@ const PostCard = ({ post, preview = false }) => {
           </div>
           <button
             onClick={handleLike}
-            className="badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+            className={
+              isLiked
+                ? "liked badge badge-secondary flex items-center cursor-pointer text-xs"
+                : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+            }
           >
-            <ThumbsUp className="w-[1em]" /> {post.likes}
+            <ThumbsUp className="w-[1em]" /> {likes}
           </button>
           <button
             onClick={handleDislike}
-            className="badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+            className={
+              isDisliked
+                ? "disliked badge badge-secondary flex items-center cursor-pointer text-xs"
+                : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+            }
           >
-            <ThumbsDown className="w-[1em]" /> {post.dislikes}
+            <ThumbsDown className="w-[1em]" /> {dislikes}
           </button>
         </div>
       </span>
+      <h2 className="card-title">{post.title}</h2>
       {preview ? (
         <p>
           {post.content.slice(0, 500)}
@@ -165,7 +341,7 @@ const PostCard = ({ post, preview = false }) => {
       )}
 
       {/* Image container */}
-      <div className={`flex justify-center ${images.length > 0 ? 'mt-5' : ''}`}>
+      <div className={`flex justify-center ${images.length > 0 ? "mt-5" : ""}`}>
         <div
           id="imageContainer"
           ref={imageContainerRef}
