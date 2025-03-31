@@ -24,6 +24,10 @@ const Home = () => {
   const [newPassword, setNewPassword] = useState("");
   const [bio, setBio] = useState("");
 
+  // New state for messaging
+  const [isMessageBoxOpen, setIsMessageBoxOpen] = useState(false);
+  const [messageContent, setMessageContent] = useState("");
+
   // Fetch Profile Details
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -148,6 +152,39 @@ const Home = () => {
       .catch((error) => {
         console.log("Logout failed:", error);
       });
+  };
+
+  const handleSendMessage = async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      // Send the message to the backend
+      await axios.post(
+        `${apiBaseUrl}/api/v1/messages`,
+        {
+          recipient: id,
+          content: messageContent,
+        },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken,
+          },
+          withCredentials: true,
+        }
+      );
+
+      alert("Message sent successfully!");
+      setMessageContent("");
+      setIsMessageBoxOpen(false);
+    } catch (error) {
+      console.error("Error sending message:", error.response ? error.response.data : error.message);
+      alert(`Failed to send message:\n${error.response ? error.response.data.error : error.message}`);
+    }
   };
 
   const [posts, setPosts] = useState([]);
@@ -291,16 +328,44 @@ const Home = () => {
                 </button>
               )
             ) : (
-              <Link
-                to={`/message/${id}`}
+              <button
+                onClick={() => setIsMessageBoxOpen(true)}
                 className="btn btn-primary btn-sm"
               >
                 Message
-              </Link>
+              </button>
             )}
           </div>
         </div>
-        {/* Posts List */}
+        {isMessageBoxOpen && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+              <div className="bg-white text-black p-6 rounded shadow-lg w-full max-w-md z-50">
+                <h3 className="text-lg font-bold mb-4">Send a Message to {id}</h3>
+                <textarea
+            value={messageContent}
+            onChange={(e) => setMessageContent(e.target.value)}
+            className="textarea textarea-bordered w-full mb-4"
+            rows="4"
+            placeholder="Type your message here..."
+                ></textarea>
+                <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setIsMessageBoxOpen(false)}
+              className="btn btn-secondary btn-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSendMessage}
+              className="btn btn-primary btn-sm"
+            >
+              Send
+            </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Posts List */}
         <div className="w-full flex flex-col justify-center items-center">
           {posts.length > 0 ? (
             posts.map((post) => (

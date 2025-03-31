@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import {Home, Login, Post, Register, User, Create, EditPost} from './pages/pages.js'
+import {Home, Login, Post, Register, User, Create, EditPost, Notifications} from './pages/pages.js'
 
 const App = () => {
   return (
@@ -13,6 +13,7 @@ const App = () => {
 			<Route path="/edit/post/:id" element={<EditPost />} />
 			<Route path="/user/:id" element={<User />} />
 			<Route path="/create/" element={<Create />} />
+			<Route path="/notifications" element={<Notifications />} />
 
 			{/* Navigate to / if parameters don't exist */}
 			<Route path="/search" element={<Navigate to="/" />} />
