@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import {Home, Login, Post, Register, User, Create} from './pages/pages.js'
+import {Home, Login, Post, Register, User, Create, Notifications} from './pages/pages.js'
 
 const App = () => {
   return (
@@ -12,6 +12,7 @@ const App = () => {
 			<Route path="/post/:id" element={<Post />} />
 			<Route path="/user/:id" element={<User />} />
 			<Route path="/create/" element={<Create />} />
+			<Route path="/notifications" element={<Notifications />} />
 
 			{/* Navigate to / if parameters don't exist */}
 			<Route path="/search" element={<Navigate to="/" />} />
