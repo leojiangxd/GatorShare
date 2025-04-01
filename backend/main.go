@@ -553,6 +553,18 @@ func getCurrentUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"username": username})
 }
 
+// GetUserLikedPosts godoc
+//
+// @Summary 		Retrieves posts liked by a specific user
+// @Description 	This API fetches all posts that have been liked by a specific user, identified by their username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {array} models.Post
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		404 {object} string "User not found"
+// @Router 			/member/{username}/liked-posts [get]
 func getUserLikedPosts(c *gin.Context) {
 	username := c.Param("username")
 
@@ -565,6 +577,18 @@ func getUserLikedPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": member.LikedPosts})
 }
 
+// GetUserDislikedPosts godoc
+//
+// @Summary 		Retrieves posts disliked by a specific user
+// @Description		This API fetches all posts that have been disliked by a specific user, identified by their username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {array} models.Post
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		404 {object} string "User not found"
+// @Router 			/member/{username}/disliked-posts [get]
 func getUserDislikedPosts(c *gin.Context) {
 	username := c.Param("username")
 
@@ -887,6 +911,19 @@ func incrementPostViews(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "View count incremented", "views": post.Views})
 }
 
+// LikeOrDislikePost godoc
+//
+// @Summary 		Likes or dislikes a post
+// @Description 	This API allows a logged-in user to like or dislike a specific post. The action is specified in the request body as either "like" or "dislike".
+// @Tags 			post
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Success 		200 {object} map[string]interface{} "Action applied successfully with updated like/dislike counts"
+// @Failure 		400 {object} string "Bad Request or Invalid Action"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		404 {object} string "Post not found"
+// @Router 			/post/{postId}/like-dislike [put]
 func likeOrDislikePost(c *gin.Context) {
 	// Check if the user is authorized
 	if err := Authorize(c); err != nil {
@@ -986,6 +1023,18 @@ func containsPost(posts []*models.Post, postId string) bool {
 	return false
 }
 
+// GetComments godoc
+//
+// @Summary 		Retrieves all comments for a specific post
+// @Description 	This API fetches all comments associated with a specific post, ordered by creation date (latest first).
+// @Tags 			comment
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Success 		200 {array} models.Comment "List of comments"
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		404 {object} string "Post not found"
+// @Router 			/comment/{postId}/ [get]
 func getComments(c *gin.Context) {
 	postId := c.Param("postId")
 
@@ -1008,6 +1057,19 @@ func getComments(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": comments})
 }
 
+// GetCommentById godoc
+//
+// @Summary 		Retrieves a specific comment by its ID
+// @Description 	This API fetches a comment associated with a specific post by its unique comment ID.
+// @Tags 			comment
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Param 			commentId path string true "Comment ID"
+// @Success 		200 {object} models.Comment "Comment details"
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		404 {object} string "Comment not found"
+// @Router 			/comment/{postId}/{commentId} [get]
 func getCommentById(c *gin.Context) {
 	postId := c.Param("postId")
 	commentId := c.Param("commentId")
@@ -1023,6 +1085,20 @@ func getCommentById(c *gin.Context) {
 	}
 }
 
+// CreateComment godoc
+//
+// @Summary 		Creates a new comment on a post
+// @Description 	This API allows a logged-in user to add a new comment to a specific post.
+// @Tags 			comment
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Param 			comment body models.Comment true "New comment data"
+// @Success 		200 {object} models.Comment "Created comment details"
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		404 {object} string "Post not found"
+// @Router 			/comment/{postId} [post]
 func createComment(c *gin.Context) {
 	// Check if user is logged in
 	if err := Authorize(c); err != nil {
@@ -1076,6 +1152,21 @@ func createComment(c *gin.Context) {
 	}
 }
 
+// UpdateComment godoc
+//
+// @Summary 		Updates an existing comment
+// @Description 	This API allows the author of a comment to update its content.
+// @Tags 			comment
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Param 			commentId path string true "Comment ID"
+// @Success 		200 {object} models.Comment "Updated comment details"
+// @Failure 		400 {object} string "Bad Request or Empty Content"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		403 {object} string "Forbidden - Only the author can update their own comments"
+// @Failure 		404 {object} string "Comment not found"
+// @Router 			/comment/{postId}/{commentId} [put]
 func updateComment(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -1124,6 +1215,21 @@ func updateComment(c *gin.Context) {
 	})
 }
 
+// DeleteComment godoc
+//
+// @Summary 		Deletes an existing comment
+// @Description 	This API allows the author of a comment to delete it from a specific post.
+// @Tags 			comment
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Param 			commentId path string true "Comment ID"
+// @Success 		200 {object} string "Comment deleted successfully"
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		403 {object} string "Forbidden - Only the author can delete their own comments"
+// @Failure 		404 {object} string "Comment not found"
+// @Router 			/comment/{postId}/{commentId} [delete]
 func deleteComment(c *gin.Context) {
 	// Check if user is logged in
 	if err := Authorize(c); err != nil {

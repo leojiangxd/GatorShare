@@ -88,6 +88,196 @@ info:
   title: GatorShare API
   version: "1.0"
 paths:
+  /comment/{postId}:
+    post:
+      consumes:
+      - application/json
+      description: This API allows a logged-in user to add a new comment to a specific
+        post.
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: New comment data
+        in: body
+        name: comment
+        required: true
+        schema:
+          $ref: '#/definitions/models.Comment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Created comment details
+          schema:
+            $ref: '#/definitions/models.Comment'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Post not found
+          schema:
+            type: string
+      summary: Creates a new comment on a post
+      tags:
+      - comment
+  /comment/{postId}/:
+    get:
+      consumes:
+      - application/json
+      description: This API fetches all comments associated with a specific post,
+        ordered by creation date (latest first).
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of comments
+          schema:
+            items:
+              $ref: '#/definitions/models.Comment'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Post not found
+          schema:
+            type: string
+      summary: Retrieves all comments for a specific post
+      tags:
+      - comment
+  /comment/{postId}/{commentId}:
+    delete:
+      consumes:
+      - application/json
+      description: This API allows the author of a comment to delete it from a specific
+        post.
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Comment deleted successfully
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden - Only the author can delete their own comments
+          schema:
+            type: string
+        "404":
+          description: Comment not found
+          schema:
+            type: string
+      summary: Deletes an existing comment
+      tags:
+      - comment
+    get:
+      consumes:
+      - application/json
+      description: This API fetches a comment associated with a specific post by its
+        unique comment ID.
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Comment details
+          schema:
+            $ref: '#/definitions/models.Comment'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Comment not found
+          schema:
+            type: string
+      summary: Retrieves a specific comment by its ID
+      tags:
+      - comment
+    put:
+      consumes:
+      - application/json
+      description: This API allows the author of a comment to update its content.
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated comment details
+          schema:
+            $ref: '#/definitions/models.Comment'
+        "400":
+          description: Bad Request or Empty Content
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden - Only the author can update their own comments
+          schema:
+            type: string
+        "404":
+          description: Comment not found
+          schema:
+            type: string
+      summary: Updates an existing comment
+      tags:
+      - comment
   /current-user:
     get:
       consumes:
@@ -292,6 +482,70 @@ paths:
       summary: Gets a member's info by their username
       tags:
       - member
+  /member/{username}/disliked-posts:
+    get:
+      consumes:
+      - application/json
+      description: This API fetches all posts that have been disliked by a specific
+        user, identified by their username.
+      parameters:
+      - description: Username of the member
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Post'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Retrieves posts disliked by a specific user
+      tags:
+      - member
+  /member/{username}/liked-posts:
+    get:
+      consumes:
+      - application/json
+      description: This API fetches all posts that have been liked by a specific user,
+        identified by their username.
+      parameters:
+      - description: Username of the member
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Post'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Retrieves posts liked by a specific user
+      tags:
+      - member
   /member/{username}/posts:
     get:
       consumes:
@@ -492,6 +746,41 @@ paths:
           schema:
             type: string
       summary: Increments the view count of a post
+      tags:
+      - post
+  /post/{postId}/like-dislike:
+    put:
+      consumes:
+      - application/json
+      description: This API allows a logged-in user to like or dislike a specific
+        post. The action is specified in the request body as either "like" or "dislike".
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Action applied successfully with updated like/dislike counts
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request or Invalid Action
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Post not found
+          schema:
+            type: string
+      summary: Likes or dislikes a post
       tags:
       - post
   /register:

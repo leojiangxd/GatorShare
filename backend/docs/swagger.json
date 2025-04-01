@@ -9,6 +9,285 @@
     "host": "localhost:8080",
     "basePath": "/api/v1",
     "paths": {
+        "/comment/{postId}": {
+            "post": {
+                "description": "This API allows a logged-in user to add a new comment to a specific post.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "comment"
+                ],
+                "summary": "Creates a new comment on a post",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New comment data",
+                        "name": "comment",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Comment"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Created comment details",
+                        "schema": {
+                            "$ref": "#/definitions/models.Comment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/comment/{postId}/": {
+            "get": {
+                "description": "This API fetches all comments associated with a specific post, ordered by creation date (latest first).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "comment"
+                ],
+                "summary": "Retrieves all comments for a specific post",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of comments",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Comment"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/comment/{postId}/{commentId}": {
+            "get": {
+                "description": "This API fetches a comment associated with a specific post by its unique comment ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "comment"
+                ],
+                "summary": "Retrieves a specific comment by its ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comment details",
+                        "schema": {
+                            "$ref": "#/definitions/models.Comment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Comment not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "This API allows the author of a comment to update its content.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "comment"
+                ],
+                "summary": "Updates an existing comment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated comment details",
+                        "schema": {
+                            "$ref": "#/definitions/models.Comment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request or Empty Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Only the author can update their own comments",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Comment not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "This API allows the author of a comment to delete it from a specific post.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "comment"
+                ],
+                "summary": "Deletes an existing comment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comment deleted successfully",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Only the author can delete their own comments",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Comment not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/current-user": {
             "get": {
                 "description": "This API returns the username of the currently logged-in Member",
@@ -312,6 +591,100 @@
                 }
             }
         },
+        "/member/{username}/disliked-posts": {
+            "get": {
+                "description": "This API fetches all posts that have been disliked by a specific user, identified by their username.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "member"
+                ],
+                "summary": "Retrieves posts disliked by a specific user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username of the member",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Post"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/member/{username}/liked-posts": {
+            "get": {
+                "description": "This API fetches all posts that have been liked by a specific user, identified by their username.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "member"
+                ],
+                "summary": "Retrieves posts liked by a specific user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username of the member",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Post"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/member/{username}/posts": {
             "get": {
                 "description": "This API fetches all posts created by a specific member",
@@ -605,6 +978,57 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/post/{postId}/like-dislike": {
+            "put": {
+                "description": "This API allows a logged-in user to like or dislike a specific post. The action is specified in the request body as either \"like\" or \"dislike\".",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "post"
+                ],
+                "summary": "Likes or dislikes a post",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Action applied successfully with updated like/dislike counts",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request or Invalid Action",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
                         "schema": {
                             "type": "string"
                         }
