@@ -136,3 +136,4 @@ Incomplete:
 - PDF version of the swagger documentation in the github repo as api-documentation.pdf
 
 ## Sprint Video
+https://youtu.be/mAL1YNO7b4A
