@@ -9,10 +9,11 @@ Completed:
 - Editing and deleting posts/comments
 - Sorting posts by creation, likes, dislikes, views, and comments
 - Searching for posts by author, title, or content
+- Messaging/notification system
 
 Incomplete:
 - Liking/disliking comments
-- Messaging/notification system
+
 
 ### Backend
 Completed:
