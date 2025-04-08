@@ -20,6 +20,8 @@ type Member struct {
 	// Relationships
 	LikedPosts    []*Post `gorm:"many2many:member_likes;" json:"liked_posts"`
 	DislikedPosts []*Post `gorm:"many2many:member_dislikes;" json:"disliked_posts"`
+	LikedComments   []*Comment `gorm:"many2many:member_comment_likes;" json:"liked_comments"`
+    DislikedComments []*Comment `gorm:"many2many:member_comment_dislikes;" json:"disliked_comments"`
 }
 
 type StringArray []string
@@ -65,6 +67,10 @@ type Comment struct {
 	Content   string `json:"content"`
 	Likes     int    `json:"likes"`
 	Dislikes  int    `json:"dislikes"`
+	
+	// Relationships
+	LikedByMembers    []*Member `gorm:"many2many:member_comment_likes;" json:"liked_comments"`
+	DislikedByMembers []*Member `gorm:"many2many:member_comment_dislikes;" json:"disliked_comments"`
 }
 
 type SearchQuery struct {

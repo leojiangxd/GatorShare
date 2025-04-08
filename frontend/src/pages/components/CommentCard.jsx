@@ -11,27 +11,122 @@ const CommentCard = ({ comment }) => {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
   const [ownComment, setOwnComment] = useState(false);
+  
+  // New state for like/dislike functionality
+  const [likes, setLikes] = useState(comment.likes || 0);
+  const [dislikes, setDislikes] = useState(comment.dislikes || 0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isDisliked, setIsDisliked] = useState(false);
 
   useEffect(() => {
     const initializeComment = async () => {
-      const username = await getUsername();
-      if (!username) return;
-      if (username === comment.author) {
-        setOwnComment(true);
+      try {
+        const username = await getUsername();
+        if (!username) return;
+        
+        if (username === comment.author) {
+          setOwnComment(true);
+        }
+        
+        // Initialize likes/dislikes count
+        setLikes(comment.likes || 0);
+        setDislikes(comment.dislikes || 0);
+
+        // Fetch user's like/dislike status for this comment
+        const [likeResponse, dislikeResponse] = await Promise.all([
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/liked-comments`),
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/disliked-comments`),
+        ]);
+
+        setIsLiked(
+          likeResponse.data.data.some(
+            (likedComment) => likedComment.comment_id === comment.comment_id
+          )
+        );
+
+        setIsDisliked(
+          dislikeResponse.data.data.some(
+            (dislikedComment) => dislikedComment.comment_id === comment.comment_id
+          )
+        );
+      } catch (error) {
+        console.error("Error initializing comment:", error);
       }
     };
   
     initializeComment();
-  }, [comment]); // Keep the correct dependency
+  }, [comment]); 
 
-  const handleLike = (e) => {
+  const handleLike = async (e) => {
     e.preventDefault();
-    alert("liked comment");
+    e.stopPropagation();
+
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      const response = await axios.put(
+        `${apiBaseUrl}/api/v1/comment/${id}/${comment.comment_id}/like-dislike`,
+        { action: "like" },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      // Update the like/dislike counts from the response
+      setLikes(response.data.likes);
+      setDislikes(response.data.dislikes);
+      setIsLiked(!isLiked);
+      setIsDisliked(false);
+    } catch (error) {
+      console.error(
+        "Error liking comment:",
+        error.response ? error.response.data : error.message
+      );
+    }
   };
 
-  const handleDislike = (e) => {
+  const handleDislike = async (e) => {
     e.preventDefault();
-    alert("disliked comment");
+    e.stopPropagation();
+
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        navigate("/login");
+        return;
+      }
+
+      const response = await axios.put(
+        `${apiBaseUrl}/api/v1/comment/${id}/${comment.comment_id}/like-dislike`,
+        { action: "dislike" },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      // Update the like/dislike counts from the response
+      setLikes(response.data.likes);
+      setDislikes(response.data.dislikes);
+      setIsDisliked(!isDisliked);
+      setIsLiked(false);
+    } catch (error) {
+      console.error(
+        "Error disliking comment:",
+        error.response ? error.response.data : error.message
+      );
+    }
   };
 
   const handleDelete = async () => {
@@ -136,15 +231,23 @@ const CommentCard = ({ comment }) => {
             <div className="flex gap-2">
               <button
                 onClick={handleLike}
-                className="badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                className={
+                  isLiked
+                    ? "liked badge badge-secondary flex items-center cursor-pointer text-xs"
+                    : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                }
               >
-                <ThumbsUp className="w-[1em]" /> {comment.likes}
+                <ThumbsUp className="w-[1em]" /> {likes}
               </button>
               <button
                 onClick={handleDislike}
-                className="badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                className={
+                  isDisliked
+                    ? "disliked badge badge-secondary flex items-center cursor-pointer text-xs"
+                    : "badge badge-primary hover:badge-secondary flex items-center cursor-pointer transition-colors duration-350 text-xs"
+                }
               >
-                <ThumbsDown className="w-[1em]" /> {comment.dislikes}
+                <ThumbsDown className="w-[1em]" /> {dislikes}
               </button>
             </div>
           </div>

@@ -78,6 +78,8 @@ func main() {
 
 		v1.GET("member/:username/liked-posts", getUserLikedPosts)
 		v1.GET("member/:username/disliked-posts", getUserDislikedPosts)
+		v1.GET("member/:username/liked-comments", getUserLikedComments)
+		v1.GET("member/:username/disliked-comments", getUserDislikedComments)
 
 		// post routes
 		v1.GET("post", getPosts)
@@ -95,6 +97,7 @@ func main() {
 		v1.POST("comment/:postId", createComment)
 		v1.PUT("comment/:postId/:commentId", updateComment)
 		v1.DELETE("comment/:postId/:commentId", deleteComment)
+		v1.PUT("comment/:postId/:commentId/like-dislike", likeOrDislikeComment)
 
 	}
 
@@ -1265,4 +1268,114 @@ func deleteComment(c *gin.Context) {
 	// Delete the comment
 	db.Delete(&comment)
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
+}
+
+func likeOrDislikeComment(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	username := getUsername(c)
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	postId := c.Param("postId")
+	commentId := c.Param("commentId")
+	var comment models.Comment
+
+	if err := db.First(&comment, "comment_id = ? AND post_id = ?", commentId, postId).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	var request struct {
+		Action string `json:"action"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var member models.Member
+	if err := db.Preload("LikedComments").Preload("DislikedComments").First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	switch request.Action {
+	case "like":
+		if containsComment(member.LikedComments, comment.CommentId) {
+			db.Model(&member).Association("LikedComments").Delete(&comment)
+			comment.Likes--
+		} else {
+			if containsComment(member.DislikedComments, comment.CommentId) {
+				db.Model(&member).Association("DislikedComments").Delete(&comment)
+				comment.Dislikes--
+			}
+			db.Model(&member).Association("LikedComments").Append(&comment)
+			comment.Likes++
+		}
+	case "dislike":
+		if containsComment(member.DislikedComments, comment.CommentId) {
+			db.Model(&member).Association("DislikedComments").Delete(&comment)
+			comment.Dislikes--
+		} else {
+			if containsComment(member.LikedComments, comment.CommentId) {
+				db.Model(&member).Association("LikedComments").Delete(&comment)
+				comment.Likes--
+			}
+			db.Model(&member).Association("DislikedComments").Append(&comment)
+			comment.Dislikes++
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action"})
+		return
+	}
+
+	if err := db.Save(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Action applied successfully",
+		"likes":    comment.Likes,
+		"dislikes": comment.Dislikes,
+	})
+}
+
+func containsComment(comments []*models.Comment, commentId string) bool {
+	for _, c := range comments {
+		if c.CommentId == commentId {
+			return true
+		}
+	}
+	return false
+}
+
+func getUserLikedComments(c *gin.Context) {
+	username := c.Param("username")
+
+	var member models.Member
+	if err := db.Preload("LikedComments").First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": member.LikedComments})
+}
+
+func getUserDislikedComments(c *gin.Context) {
+	username := c.Param("username")
+
+	var member models.Member
+	if err := db.Preload("DislikedComments").First(&member, "username = ?", username).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": member.DislikedComments})
 }
