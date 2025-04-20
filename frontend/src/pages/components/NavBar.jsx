@@ -115,9 +115,6 @@ const NavBar = () => {
                 <li>
                   <Link to="/notifications" className="justify-between">
                     Notifications
-                    <span className="badge bg-primary text-xs text-primary-content border-none">
-                      New
-                    </span>
                   </Link>
                 </li>
                 <li>
