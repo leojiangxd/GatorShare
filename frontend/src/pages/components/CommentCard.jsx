@@ -32,10 +32,22 @@ const CommentCard = ({ comment }) => {
         setLikes(comment.likes || 0);
         setDislikes(comment.dislikes || 0);
 
+        const csrfToken = getCsrfToken();
+
         // Fetch user's like/dislike status for this comment
         const [likeResponse, dislikeResponse] = await Promise.all([
-          axios.get(`${apiBaseUrl}/api/v1/member/${username}/liked-comments`),
-          axios.get(`${apiBaseUrl}/api/v1/member/${username}/disliked-comments`),
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/liked-comments`, {
+            headers: {
+              "X-CSRF-Token": csrfToken,
+            },
+            withCredentials: true,
+          }),
+          axios.get(`${apiBaseUrl}/api/v1/member/${username}/disliked-comments`, {
+            headers: {
+              "X-CSRF-Token": csrfToken,
+            },
+            withCredentials: true,
+          }),
         ]);
 
         setIsLiked(

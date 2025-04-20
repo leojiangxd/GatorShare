@@ -2,62 +2,55 @@ import React, { useEffect, useState } from "react";
 import NavBar from "./components/NavBar";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import dayjs from "dayjs";
-
-// Sample notifications data
-const sampleNotifications = [
-  {
-    id: 1,
-    message: "Your request for tutoring in Calculus has been accepted.",
-    type: "help",
-    timestamp: "2025-03-31T14:30:00",
-    read: false,
-  },
-  {
-    id: 2,
-    message: "New item posted: Gatorshare textbooks for sale.",
-    type: "sale",
-    timestamp: "2025-03-31T10:15:00",
-    read: true,
-  },
-  {
-    id: 3,
-    message: "Your post 'Looking for study buddies' got a new comment.",
-    type: "activity",
-    timestamp: "2025-03-30T16:45:00",
-    read: false,
-  },
-  {
-    id: 4,
-    message: "Reminder: Upcoming UFL committee meeting tomorrow.",
-    type: "reminder",
-    timestamp: "2025-03-30T09:00:00",
-    read: true,
-  },
-  {
-    id: 5,
-    message: "Your sale item 'Old Laptop' has a new offer.",
-    type: "sale",
-    timestamp: "2025-03-29T12:00:00",
-    read: false,
-  },
-];
+import { getCsrfToken } from "../utils/functions";
+import axios from "axios";
 
 const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
-  // Simulate fetching notifications from backend
   useEffect(() => {
-    // Sort notifications by timestamp (descending)
-    const sortedNotifications = sampleNotifications.sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-    );
-    setNotifications(sortedNotifications);
-  }, []);
+    const fetchNotifications = async () => {
+      try {
+        const csrfToken = getCsrfToken();
+        if (!csrfToken) {
+          console.error("CSRF token is missing.");
+          navigate("/login");
+          return;
+        }
+        const params = {
+          column: "created_at",
+          order: "desc",
+          limit: 0,
+          offset: 0,
+          search_key: "",
+        };
+        const response = await axios.get(`${apiBaseUrl}/api/v1/notification`, {
+          params,
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        });
+        const notificationsData = response.data.data;
+        const sortedNotifications = notificationsData.sort(
+          (a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt)
+        );
+        setNotifications(sortedNotifications);
+      } catch (error) {
+        console.error(
+          "Error fetching notifications:",
+          error.response?.data || error.message
+        );
+      }
+    };
 
-  // Group notifications by date
+    fetchNotifications();
+  }, [apiBaseUrl]);
+
   const groupNotificationsByDate = (notifications) => {
     return notifications.reduce((groups, notification) => {
-      const dateKey = dayjs(notification.timestamp).format("YYYY-MM-DD");
+      const dateKey = dayjs(notification.CreatedAt).format("YYYY-MM-DD");
       if (!groups[dateKey]) {
         groups[dateKey] = [];
       }
@@ -68,18 +61,123 @@ const Notifications = () => {
 
   const groupedNotifications = groupNotificationsByDate(notifications);
 
-  const toggleRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((notif) =>
-        notif.id === id ? { ...notif, read: !notif.read } : notif
-      )
-    );
+  const deleteNotification = async (id) => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        return;
+      }
+      await axios.delete(`${apiBaseUrl}/api/v1/notification/${id}`, {
+        headers: {
+          "X-CSRF-Token": csrfToken || "",
+        },
+        withCredentials: true,
+      });
+      setNotifications((prev) =>
+        prev.filter((notification) => notification.id !== id)
+      );
+    } catch (error) {
+      console.error(
+        "Error deleting notification:",
+        error.response?.data || error.message
+      );
+    }
+  }
+
+
+  const toggleRead = async (id) => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        return;
+      }
+      const notification = notifications.find((notif) => notif.id === id);
+      const updatedReadStatus = !notification.read;
+
+      await axios.put(
+        `${apiBaseUrl}/api/v1/notification/${id}`,
+        { read: updatedReadStatus },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === id ? { ...notif, read: updatedReadStatus } : notif
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Error toggling read status:",
+        error.response?.data || error.message
+      );
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) =>
-      prev.map((notif) => ({ ...notif, read: true }))
-    );
+  const markAllAsRead = async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        return;
+      }
+
+      await axios.put(
+        `${apiBaseUrl}/api/v1/notification`,
+        { read: true },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, read: true }))
+      );
+    } catch (error) {
+      console.error(
+        "Error marking all notifications as read:",
+        error.response?.data || error.message
+      );
+    }
+  };
+
+  const markAllAsUnread = async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        console.error("CSRF token is missing.");
+        return;
+      }
+
+      await axios.put(
+        `${apiBaseUrl}/api/v1/notification`,
+        { read: true },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+          withCredentials: true,
+        }
+      );
+
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, read: false }))
+      );
+    } catch (error) {
+      console.error(
+        "Error marking all notifications as read:",
+        error.response?.data || error.message
+      );
+    }
   };
 
   return (
@@ -88,9 +186,20 @@ const Notifications = () => {
       <div className="p-10 overflow-y-auto flex-grow">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Notifications</h1>
-          <button onClick={markAllAsRead} className="btn btn-secondary btn-sm">
-            Mark All as Read
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={markAllAsRead}
+              className="btn btn-secondary btn-sm"
+            >
+              Mark All as Read
+            </button>
+            <button
+              onClick={markAllAsUnread}
+              className="btn btn-secondary btn-sm"
+            >
+              Mark All as Unread
+            </button>
+          </div>
         </div>
 
         {Object.keys(groupedNotifications)
@@ -111,26 +220,28 @@ const Notifications = () => {
                     } shadow-md p-4`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {notification.type === "sale" ? (
-                          <AlertCircle className="w-6 h-6 text-warning" />
-                        ) : (
-                          <CheckCircle className="w-6 h-6 text-success" />
-                        )}
-                        <p className="text-lg">{notification.message}</p>
-                      </div>
                       <div className="text-sm text-gray-500">
-                        {dayjs(notification.timestamp).format("h:mm A")}
+                        {dayjs(notification.CreatedAt).format("h:mm A")}
+                      </div>
+                      <div className="flex gap-2">
+                      <button
+                          onClick={() => deleteNotification(notification.id)}
+                          className="btn btn-outline btn-xs"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => toggleRead(notification.id)}
+                          className="btn btn-outline btn-xs"
+                        >
+                          {notification.read
+                            ? "Mark as Unread"
+                            : "Mark as Read"}
+                        </button>
                       </div>
                     </div>
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        onClick={() => toggleRead(notification.id)}
-                        className="btn btn-outline btn-xs"
-                      >
-                        {notification.read ? "Mark as Unread" : "Mark as Read"}
-                      </button>
-                    </div>
+                    <p className="text-lg">{notification.title}</p>
+                    <p className="text-sm">{notification.content}</p>
                   </div>
                 ))}
               </div>

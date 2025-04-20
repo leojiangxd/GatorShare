@@ -210,7 +210,7 @@ const Home = () => {
       <div className="p-10 overflow-y-auto flex-grow flex flex-col items-center">
         {/* Profile Card */}
         <div className="card bg-base-100 shadow-xl mb-6 w-full max-w-md">
-          <div className="card-body pt-6">
+          <div className="card-body pt-6 pb-0">
             {/* Card Header: Avatar, Name, Email, and Edit Button */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -314,26 +314,21 @@ const Home = () => {
               isEditing ? (
                 <button
                   onClick={handleCancel}
-                  className="btn btn-outline btn-sm"
+                  className="btn btn-outline btn-sm mb-6"
                 >
                   Cancel
                 </button>
               ) : (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="btn btn-outline btn-sm"
+                  className="btn btn-outline btn-sm mb-6"
                   title="Edit Profile"
                 >
                   Edit
                 </button>
               )
             ) : (
-              <button
-                onClick={() => setIsMessageBoxOpen(true)}
-                className="btn btn-primary btn-sm"
-              >
-                Message
-              </button>
+              <div></div>
             )}
           </div>
         </div>

@@ -233,6 +233,24 @@ const PostCard = ({ post, preview = false }) => {
           withCredentials: true,
         }
       );
+      if (!ownPost) {
+        const username = await getUsername();
+        await axios.post(
+          `${apiBaseUrl}/api/v1/notification`,
+          { 
+            Username: post.author,
+            Title: `${username} commented on your post: ${post.title.trim().length > 50 ? `${post.title.trim().slice(0, 50).trim()}...` : post.title.trim()}`,
+            Content: comment.length > 100 ? `${comment.trim().slice(0, 100)}...` : comment,
+            PostId: post.post_id
+          },
+          {
+            headers: {
+              "X-CSRF-Token": csrfToken || "",
+            },
+            withCredentials: true,
+          }
+        );
+      }
       window.location.reload();
     } catch (error) {
       console.error(
