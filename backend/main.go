@@ -32,7 +32,7 @@ func connectDatabase() error {
 	if err != nil {
 		panic("Error connecting/creating the sqlite db")
 	}
-	db.AutoMigrate(&models.Member{}, &models.Post{}, &models.Comment{})
+	db.AutoMigrate(&models.Member{}, &models.Post{}, &models.Comment{}, &models.Notification{})
 	return err
 }
 
@@ -98,6 +98,14 @@ func main() {
 		v1.PUT("comment/:postId/:commentId", updateComment)
 		v1.DELETE("comment/:postId/:commentId", deleteComment)
 		v1.PUT("comment/:postId/:commentId/like-dislike", likeOrDislikeComment)
+
+		// notification routes
+		v1.GET("notification", getNotifications)
+		v1.GET("notification/:id", getNotificationById)
+		v1.POST("notification", sendNotification)
+		v1.DELETE("notification/:id", deleteNotification)
+		v1.PUT("notification/:id", updateNotification)
+		v1.PUT("notification", updateNotifications)
 
 	}
 
@@ -1357,6 +1365,11 @@ func containsComment(comments []*models.Comment, commentId string) bool {
 }
 
 func getUserLikedComments(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	username := c.Param("username")
 
 	var member models.Member
@@ -1369,6 +1382,11 @@ func getUserLikedComments(c *gin.Context) {
 }
 
 func getUserDislikedComments(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	username := c.Param("username")
 
 	var member models.Member
@@ -1378,4 +1396,173 @@ func getUserDislikedComments(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": member.DislikedComments})
+}
+
+func getNotifications(c *gin.Context) {
+
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	//Start by reading in the sorting column and direction
+	var notiQuery models.SearchQuery
+	if err := c.ShouldBindQuery(&notiQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	//If no limit or offset was passed in, set to -1 for the SQL command
+	if notiQuery.Limit == 0 {
+		notiQuery.Limit = -1
+	}
+	if notiQuery.Offset == 0 {
+		notiQuery.Offset = -1
+	}
+
+	//Format the order for sorting
+	var order string
+	if notiQuery.Order != "" {
+		order = notiQuery.Column + " " + notiQuery.Order
+	} else {
+		order = notiQuery.Column
+	}
+
+	var notis []models.Notification
+
+	// Fetch posts ordered by the passed in column, with slices specified
+	result := db.Where("username = ?", getUsername(c)).Order(order).Limit(notiQuery.Limit).Offset(notiQuery.Offset).Find(&notis)
+
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
+		return
+	}
+
+	//Get the count
+	var count int64
+	db.Model(&models.Notification{}).Where("username = ?", getUsername(c)).Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{"count": count, "data": notis})
+}
+
+func getNotificationById(c *gin.Context) {
+
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	id := c.Param("id")
+
+	var noti models.Notification
+
+	result := db.First(&noti, "id = ?", id)
+
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No Records Found"})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{"data": noti})
+	}
+}
+
+func sendNotification(c *gin.Context) {
+
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var noti models.Notification
+	if err := c.ShouldBindJSON(&noti); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if noti.Title == "" || noti.Content == "" || noti.Username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Notification title, content, and username (recipient) required"})
+		return
+	}
+
+	noti.Id = uuid.New().String()
+	noti.Read = false
+
+	db.Create(&noti)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Notification sent"})
+}
+
+func deleteNotification(c *gin.Context) {
+
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	id := c.Param("id")
+
+	var noti models.Notification
+	if err := db.First(&noti, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Notification not found"})
+		return
+	}
+
+	if noti.Username != getUsername(c) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "You can only delete your own notifications"})
+		return
+	}
+
+	db.Delete(&noti)
+	c.JSON(http.StatusOK, gin.H{"message": "Notification deleted successfully"})
+}
+
+func updateNotification(c *gin.Context) {
+
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	id := c.Param("id")
+
+	var noti models.Notification
+	if err := db.First(&noti, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found"})
+		return
+	}
+
+	if noti.Username != getUsername(c) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "You can only update your own notifications"})
+		return
+	}
+
+	var updateReq struct {
+		Read bool `json:"read"`
+	}
+	if err := c.ShouldBindJSON(&updateReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db.Model(&models.Notification{}).Where("id = ?", id).Update("read", updateReq.Read)
+	c.JSON(http.StatusOK, gin.H{"message": "Notification updated successfully"})
+}
+
+func updateNotifications(c *gin.Context) {
+
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var updateReq struct {
+		Read bool `json:"read"`
+	}
+	if err := c.ShouldBindJSON(&updateReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db.Model(&models.Notification{}).Where("username = ?", getUsername(c)).Update("read", updateReq.Read)
+	c.JSON(http.StatusOK, gin.H{"message": "Notifications updated successfully"})
 }

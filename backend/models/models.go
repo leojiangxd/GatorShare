@@ -18,10 +18,10 @@ type Member struct {
 	CSRFToken    string `json:"csrf_token"`
 
 	// Relationships
-	LikedPosts    []*Post `gorm:"many2many:member_likes;" json:"liked_posts"`
-	DislikedPosts []*Post `gorm:"many2many:member_dislikes;" json:"disliked_posts"`
-	LikedComments   []*Comment `gorm:"many2many:member_comment_likes;" json:"liked_comments"`
-    DislikedComments []*Comment `gorm:"many2many:member_comment_dislikes;" json:"disliked_comments"`
+	LikedPosts       []*Post    `gorm:"many2many:member_likes;" json:"liked_posts"`
+	DislikedPosts    []*Post    `gorm:"many2many:member_dislikes;" json:"disliked_posts"`
+	LikedComments    []*Comment `gorm:"many2many:member_comment_likes;" json:"liked_comments"`
+	DislikedComments []*Comment `gorm:"many2many:member_comment_dislikes;" json:"disliked_comments"`
 }
 
 type StringArray []string
@@ -67,10 +67,19 @@ type Comment struct {
 	Content   string `json:"content"`
 	Likes     int    `json:"likes"`
 	Dislikes  int    `json:"dislikes"`
-	
+
 	// Relationships
 	LikedByMembers    []*Member `gorm:"many2many:member_comment_likes;" json:"liked_comments"`
 	DislikedByMembers []*Member `gorm:"many2many:member_comment_dislikes;" json:"disliked_comments"`
+}
+
+type Notification struct {
+	Id        string `json:"id" gorm:"primaryKey"`
+	CreatedAt time.Time
+	Username  string `json:"username"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Read      bool   `json:"read"`
 }
 
 type SearchQuery struct {
