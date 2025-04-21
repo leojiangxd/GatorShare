@@ -22,6 +22,8 @@ type Member struct {
 	DislikedPosts    []*Post    `gorm:"many2many:member_dislikes;" json:"disliked_posts"`
 	LikedComments    []*Comment `gorm:"many2many:member_comment_likes;" json:"liked_comments"`
 	DislikedComments []*Comment `gorm:"many2many:member_comment_dislikes;" json:"disliked_comments"`
+	Followers        []*Member  `gorm:"many2many:member_followers;joinForeignKey:username;joinReferences:follower_username" json:"followers"`
+	Following        []*Member  `gorm:"many2many:member_followers;joinForeignKey:follower_username;joinReferences:username" json:"following"`
 }
 
 type StringArray []string

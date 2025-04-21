@@ -81,6 +81,11 @@ func main() {
 		v1.GET("member/:username/liked-comments", getUserLikedComments)
 		v1.GET("member/:username/disliked-comments", getUserDislikedComments)
 
+		v1.POST("member/:username/follow", followMember)
+		v1.DELETE("member/:username/follow", unfollowMember)
+		v1.GET("member/:username/followers", getFollowers)
+		v1.GET("member/:username/following", getFollowing)
+
 		// post routes
 		v1.GET("post", getPosts)
 		v1.GET("post/:postId", getPostById)
@@ -989,6 +994,11 @@ func likeOrDislikePost(c *gin.Context) {
 			db.Model(&member).Association("LikedPosts").Append(&post)
 			post.Likes++
 		}
+		if post.Author != username {
+			title := "Your post was liked!"
+			content := fmt.Sprintf("%s liked your post: %s", username, post.Title)
+			sendAutoNotification(post.Author, title, content)
+		}
 
 	case "dislike":
 		// Check if the user already disliked the post
@@ -1004,6 +1014,11 @@ func likeOrDislikePost(c *gin.Context) {
 			// Add to disliked posts and increment dislikes counter
 			db.Model(&member).Association("DislikedPosts").Append(&post)
 			post.Dislikes++
+		}
+		if post.Author != username {
+			title := "Your post was disliked!"
+			content := fmt.Sprintf("%s disliked your post: %s", username, post.Title)
+			sendAutoNotification(post.Author, title, content)
 		}
 
 	default:
@@ -1160,6 +1175,11 @@ func createComment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": result.Error.Error()})
 	} else {
 		c.JSON(http.StatusOK, gin.H{"message": "Comment created successfully", "data": newComment})
+		if post.Author != username {
+			title := "New comment on your post!"
+			content := fmt.Sprintf("%s commented: %s", username, newComment.Content)
+			sendAutoNotification(post.Author, title, content)
+		}
 	}
 }
 
@@ -1278,6 +1298,19 @@ func deleteComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
 }
 
+// LikeOrDislikeComment godoc
+//
+// @Summary 		Like or dislike action on a comment
+// @Description 	This API allows a logged-in user to like or dislike a specific comment. The action is specified in the request body as either "like" or "dislike".
+// @Tags 			comment
+// @Accept 			json
+// @Produce 		json
+// @Param 			postId path string true "Post ID"
+// @Param 			commentId path string true "Comment ID"
+// @Success 		200 {object} map[string]interface{} "Action applied successfully with updated like/dislike counts"
+// @Failure 		400 {object} string "Invalid action"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/comment/{postId}/{commentId}/like-dislike [put]
 func likeOrDislikeComment(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -1326,6 +1359,12 @@ func likeOrDislikeComment(c *gin.Context) {
 			db.Model(&member).Association("LikedComments").Append(&comment)
 			comment.Likes++
 		}
+		if comment.Author != username {
+			title := "Your comment was liked!"
+			content := fmt.Sprintf("%s liked your comment: %s", username, comment.Content)
+			sendAutoNotification(comment.Author, title, content)
+		}
+
 	case "dislike":
 		if containsComment(member.DislikedComments, comment.CommentId) {
 			db.Model(&member).Association("DislikedComments").Delete(&comment)
@@ -1338,6 +1377,12 @@ func likeOrDislikeComment(c *gin.Context) {
 			db.Model(&member).Association("DislikedComments").Append(&comment)
 			comment.Dislikes++
 		}
+		if comment.Author != username {
+			title := "Your comment was disliked!"
+			content := fmt.Sprintf("%s disliked your comment: %s", username, comment.Content)
+			sendAutoNotification(comment.Author, title, content)
+		}
+
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action"})
 		return
@@ -1355,6 +1400,7 @@ func likeOrDislikeComment(c *gin.Context) {
 	})
 }
 
+// Helper function to check if a comment is in a list of comments
 func containsComment(comments []*models.Comment, commentId string) bool {
 	for _, c := range comments {
 		if c.CommentId == commentId {
@@ -1364,6 +1410,19 @@ func containsComment(comments []*models.Comment, commentId string) bool {
 	return false
 }
 
+// GetUserLikedComments godoc
+//
+// @Summary 		Retrieves comments liked by a specific user
+// @Description 	This API fetches all comments that have been liked by a specific user, identified by their username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {array} models.Comment
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		404 {object} string "User not found"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/member/{username}/liked-comments [get]
 func getUserLikedComments(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -1381,6 +1440,19 @@ func getUserLikedComments(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": member.LikedComments})
 }
 
+// GetUserDislikedComments godoc
+//
+// @Summary 		Retrieves comments disliked by a specific user
+// @Description 	This API fetches all comments that have been disliked by a specific user, identified by their username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {array} models.Comment
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		404 {object} string "User not found"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/member/{username}/disliked-comments [get]
 func getUserDislikedComments(c *gin.Context) {
 	if err := Authorize(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -1398,6 +1470,17 @@ func getUserDislikedComments(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": member.DislikedComments})
 }
 
+// GetNotifications godoc
+//
+// @Summary 		Gets notifications for the current user
+// @Description 	Fetches a slice of notifications for the logged-in user. Supports optional query parameters for sorting, limit, and offset.
+// @Tags 			notification
+// @Accept 			json
+// @Produce 		json
+// @Success 		200 {object} map[string]interface{} "Notifications list and count"
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/notification [get]
 func getNotifications(c *gin.Context) {
 
 	if err := Authorize(c); err != nil {
@@ -1445,6 +1528,18 @@ func getNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"count": count, "data": notis})
 }
 
+// GetNotificationById godoc
+//
+// @Summary 		Gets a notification by its ID
+// @Description 	Fetches a single notification by its unique ID.
+// @Tags 			notification
+// @Accept 			json
+// @Produce 		json
+// @Param 			id path string true "Notification ID"
+// @Success 		200 {object} models.Notification
+// @Failure 		400 {object} string "No Records Found"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/notification/{id} [get]
 func getNotificationById(c *gin.Context) {
 
 	if err := Authorize(c); err != nil {
@@ -1466,6 +1561,18 @@ func getNotificationById(c *gin.Context) {
 	}
 }
 
+// SendNotification godoc
+//
+// @Summary 		Sends a notification to a user
+// @Description 	Sends a notification with a title and content to a specified user.
+// @Tags 			notification
+// @Accept 			json
+// @Produce 		json
+// @Param 			notification body models.Notification true "Notification data"
+// @Success 		201 {object} string "Notification sent"
+// @Failure 		400 {object} string "Notification title, content, and username (recipient) required"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/notification [post]
 func sendNotification(c *gin.Context) {
 
 	if err := Authorize(c); err != nil {
@@ -1492,6 +1599,18 @@ func sendNotification(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Notification sent"})
 }
 
+// DeleteNotification godoc
+//
+// @Summary 		Deletes a notification
+// @Description 	Deletes a notification by its unique ID. Only the recipient can delete their own notifications.
+// @Tags 			notification
+// @Accept 			json
+// @Produce 		json
+// @Param 			id path string true "Notification ID"
+// @Success 		200 {object} string "Notification deleted successfully"
+// @Failure 		400 {object} string "Notification not found or not owned by user"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/notification/{id} [delete]
 func deleteNotification(c *gin.Context) {
 
 	if err := Authorize(c); err != nil {
@@ -1516,6 +1635,19 @@ func deleteNotification(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Notification deleted successfully"})
 }
 
+// UpdateNotification godoc
+//
+// @Summary 		Updates a notification's read status
+// @Description 	Updates the read status of a notification by its unique ID. Only the recipient can update their own notifications.
+// @Tags 			notification
+// @Accept 			json
+// @Produce 		json
+// @Param 			id path string true "Notification ID"
+// @Success 		200 {object} string "Notification updated successfully"
+// @Failure 		404 {object} string "Notification not found"
+// @Failure 		400 {object} string "You can only update your own notifications"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/notification/{id} [put]
 func updateNotification(c *gin.Context) {
 
 	if err := Authorize(c); err != nil {
@@ -1548,6 +1680,17 @@ func updateNotification(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Notification updated successfully"})
 }
 
+// UpdateNotifications godoc
+//
+// @Summary 		Bulk update notifications' read status
+// @Description 	Sets all notifications for the logged-in user to read/unread.
+// @Tags 			notification
+// @Accept 			json
+// @Produce 		json
+// @Success 		200 {object} string "Notifications updated successfully"
+// @Failure 		400 {object} string "Bad Request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Router 			/notification [put]
 func updateNotifications(c *gin.Context) {
 
 	if err := Authorize(c); err != nil {
@@ -1565,4 +1708,135 @@ func updateNotifications(c *gin.Context) {
 
 	db.Model(&models.Notification{}).Where("username = ?", getUsername(c)).Update("read", updateReq.Read)
 	c.JSON(http.StatusOK, gin.H{"message": "Notifications updated successfully"})
+}
+
+// FollowMember godoc
+//
+// @Summary 		Follow a member
+// @Description 	Allows the logged-in user to follow another member by username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member to follow"
+// @Success 		200 {object} string "Followed successfully"
+// @Failure 		400 {object} string "Cannot follow yourself or bad request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		404 {object} string "User not found"
+// @Failure 		500 {object} string "Failed to follow"
+// @Router 			/member/{username}/follow [post]
+func followMember(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	follower := getUsername(c)
+	followee := c.Param("username")
+	if follower == followee {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot follow yourself"})
+		return
+	}
+
+	var followerMember, followeeMember models.Member
+	if db.First(&followerMember, "username = ?", follower).Error != nil ||
+		db.First(&followeeMember, "username = ?", followee).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Add follow relationship
+	if err := db.Model(&followerMember).Association("Following").Append(&followeeMember); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow"})
+		return
+	}
+
+	// Optionally, send notification
+	if follower != followee {
+		sendAutoNotification(followee, "New follower!", follower+" started following you.")
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Followed successfully"})
+}
+
+// UnfollowMember godoc
+//
+// @Summary 		Unfollow a member
+// @Description 	Allows the logged-in user to unfollow another member by username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member to unfollow"
+// @Success 		200 {object} string "Unfollowed successfully"
+// @Failure 		400 {object} string "Cannot unfollow yourself or bad request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		404 {object} string "User not found"
+// @Failure 		500 {object} string "Failed to unfollow"
+// @Router 			/member/{username}/follow [delete]
+func unfollowMember(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	follower := getUsername(c)
+	followee := c.Param("username")
+	if follower == followee {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot unfollow yourself"})
+		return
+	}
+
+	var followerMember, followeeMember models.Member
+	if db.First(&followerMember, "username = ?", follower).Error != nil ||
+		db.First(&followeeMember, "username = ?", followee).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Remove follow relationship
+	if err := db.Model(&followerMember).Association("Following").Delete(&followeeMember); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unfollow"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Unfollowed successfully"})
+}
+
+// GetFollowers godoc
+//
+// @Summary 		Get a member's followers
+// @Description 	Retrieves a list of members who follow the specified user.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {object} map[string]interface{} "List of followers"
+// @Failure 		404 {object} string "User not found"
+// @Router 			/member/{username}/followers [get]
+func getFollowers(c *gin.Context) {
+	username := c.Param("username")
+	var member models.Member
+	if db.Preload("Followers").First(&member, "username = ?", username).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": member.Followers})
+}
+
+// GetFollowing godoc
+//
+// @Summary 		Get members a user is following
+// @Description 	Retrieves a list of members that the specified user is following.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {object} map[string]interface{} "List of following"
+// @Failure 		404 {object} string "User not found"
+// @Router 			/member/{username}/following [get]
+func getFollowing(c *gin.Context) {
+	username := c.Param("username")
+	var member models.Member
+	if db.Preload("Following").First(&member, "username = ?", username).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": member.Following})
 }
