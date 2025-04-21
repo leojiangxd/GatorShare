@@ -11,6 +11,7 @@ Completed:
 
 Incomplete:
 - Messaging system
+- Follower system
 
 
 ### Backend
@@ -20,6 +21,7 @@ Completed:
 - Getting notifications API
 - Deleting notifications API
 - Liking/disliking comments API
+- Follow/Unfollow API
 
 Incomplete:
 - Messaging API
