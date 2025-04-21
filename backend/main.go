@@ -81,6 +81,11 @@ func main() {
 		v1.GET("member/:username/liked-comments", getUserLikedComments)
 		v1.GET("member/:username/disliked-comments", getUserDislikedComments)
 
+		v1.POST("member/:username/follow", followMember)
+		v1.DELETE("member/:username/follow", unfollowMember)
+		v1.GET("member/:username/followers", getFollowers)
+		v1.GET("member/:username/following", getFollowing)
+
 		// post routes
 		v1.GET("post", getPosts)
 		v1.GET("post/:postId", getPostById)
@@ -1703,4 +1708,135 @@ func updateNotifications(c *gin.Context) {
 
 	db.Model(&models.Notification{}).Where("username = ?", getUsername(c)).Update("read", updateReq.Read)
 	c.JSON(http.StatusOK, gin.H{"message": "Notifications updated successfully"})
+}
+
+// FollowMember godoc
+//
+// @Summary 		Follow a member
+// @Description 	Allows the logged-in user to follow another member by username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member to follow"
+// @Success 		200 {object} string "Followed successfully"
+// @Failure 		400 {object} string "Cannot follow yourself or bad request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		404 {object} string "User not found"
+// @Failure 		500 {object} string "Failed to follow"
+// @Router 			/member/{username}/follow [post]
+func followMember(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	follower := getUsername(c)
+	followee := c.Param("username")
+	if follower == followee {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot follow yourself"})
+		return
+	}
+
+	var followerMember, followeeMember models.Member
+	if db.First(&followerMember, "username = ?", follower).Error != nil ||
+		db.First(&followeeMember, "username = ?", followee).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Add follow relationship
+	if err := db.Model(&followerMember).Association("Following").Append(&followeeMember); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow"})
+		return
+	}
+
+	// Optionally, send notification
+	if follower != followee {
+		sendAutoNotification(followee, "New follower!", follower+" started following you.")
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Followed successfully"})
+}
+
+// UnfollowMember godoc
+//
+// @Summary 		Unfollow a member
+// @Description 	Allows the logged-in user to unfollow another member by username.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member to unfollow"
+// @Success 		200 {object} string "Unfollowed successfully"
+// @Failure 		400 {object} string "Cannot unfollow yourself or bad request"
+// @Failure 		401 {object} string "Unauthorized"
+// @Failure 		404 {object} string "User not found"
+// @Failure 		500 {object} string "Failed to unfollow"
+// @Router 			/member/{username}/follow [delete]
+func unfollowMember(c *gin.Context) {
+	if err := Authorize(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	follower := getUsername(c)
+	followee := c.Param("username")
+	if follower == followee {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot unfollow yourself"})
+		return
+	}
+
+	var followerMember, followeeMember models.Member
+	if db.First(&followerMember, "username = ?", follower).Error != nil ||
+		db.First(&followeeMember, "username = ?", followee).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Remove follow relationship
+	if err := db.Model(&followerMember).Association("Following").Delete(&followeeMember); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unfollow"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Unfollowed successfully"})
+}
+
+// GetFollowers godoc
+//
+// @Summary 		Get a member's followers
+// @Description 	Retrieves a list of members who follow the specified user.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {object} map[string]interface{} "List of followers"
+// @Failure 		404 {object} string "User not found"
+// @Router 			/member/{username}/followers [get]
+func getFollowers(c *gin.Context) {
+	username := c.Param("username")
+	var member models.Member
+	if db.Preload("Followers").First(&member, "username = ?", username).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": member.Followers})
+}
+
+// GetFollowing godoc
+//
+// @Summary 		Get members a user is following
+// @Description 	Retrieves a list of members that the specified user is following.
+// @Tags 			member
+// @Accept 			json
+// @Produce 		json
+// @Param 			username path string true "Username of the member"
+// @Success 		200 {object} map[string]interface{} "List of following"
+// @Failure 		404 {object} string "User not found"
+// @Router 			/member/{username}/following [get]
+func getFollowing(c *gin.Context) {
+	username := c.Param("username")
+	var member models.Member
+	if db.Preload("Following").First(&member, "username = ?", username).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": member.Following})
 }

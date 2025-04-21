@@ -46,7 +46,7 @@ func SetUpRouter() *gin.Engine {
 	{
 		v1.GET("/", index)
 
-		// user routes
+		// member routes
 		v1.GET("member", getMembers)
 		v1.GET("member/:username", getMemberByUsername)
 		v1.POST("register", register)
@@ -58,6 +58,11 @@ func SetUpRouter() *gin.Engine {
 
 		v1.GET("current-user", getCurrentUser)
 		v1.GET("member/:username/liked-posts", getUserLikedPosts)
+
+		v1.POST("member/:username/follow", followMember)
+		v1.DELETE("member/:username/follow", unfollowMember)
+		v1.GET("member/:username/followers", getFollowers)
+		v1.GET("member/:username/following", getFollowing)
 
 		// post routes
 		v1.GET("post", getPosts)
@@ -98,7 +103,7 @@ func TestRegister(t *testing.T) {
 		Email:    "bettercallsaul@test.com",
 		Username: "saul",
 		Password: "Money123",
-		Bio:      "Test Bio",
+		Bio:      "Best Lawyer",
 	}
 
 	jsonValue, _ := json.Marshal(user)
@@ -145,7 +150,7 @@ func TestGetMemberByUsername(t *testing.T) {
 		Email:    "bettercallsaul@test.com",
 		Username: "saul",
 		Password: "Money123",
-		Bio:      "Test Bio",
+		Bio:      "Best Lawyer",
 	}
 
 	req, _ := http.NewRequest("GET", "/api/v1/member/saul", nil)
@@ -1087,5 +1092,84 @@ func TestDeleteNotification(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Notification deleted successfully")
 
 	//Deleting user created for testing APIs
+	//TestDeleteMember(t)
+}
+func TestFollowUnfollowSystem(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Register and login as "gus" (the user to be followed/unfollowed)
+	gus := models.Member{
+		Email:    "gusfring@test.com",
+		Username: "gus",
+		Password: "LosPollos123",
+		Bio:      "Chicken Man",
+	}
+	jsonValue, _ := json.Marshal(gus)
+	req, _ := http.NewRequest("POST", "/api/v1/register", bytes.NewBuffer(jsonValue))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	// 'saul' following 'gus'
+	req, _ = http.NewRequest("POST", "/api/v1/member/gus/follow", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Followed successfully")
+
+	// Validating members followed by 'saul'
+	req, _ = http.NewRequest("GET", "/api/v1/member/saul/following", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "gus")
+
+	// Validating followers of 'gus'
+	req, _ = http.NewRequest("GET", "/api/v1/member/gus/followers", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "saul")
+
+	// 'saul' unfollowing 'gus'
+	req, _ = http.NewRequest("DELETE", "/api/v1/member/gus/follow", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Unfollowed successfully")
+
+	// Validating members followed by 'saul' after unfollowing 'gus'
+	req, _ = http.NewRequest("GET", "/api/v1/member/saul/following", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	following := response["data"].([]interface{})
+	assert.Equal(t, 0, len(following))
+
+	// Validating followers of 'gus' after 'saul' unfollowed
+	req, _ = http.NewRequest("GET", "/api/v1/member/gus/followers", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	json.Unmarshal(w.Body.Bytes(), &response)
+	followers := response["data"].([]interface{})
+	assert.Equal(t, 0, len(followers))
+
+	// Deleting 'gus' user created for testing this API
+	var gusUser models.Member
+	err = db.Where("username = ?", "gus").First(&gusUser).Error
+	if err == nil {
+		db.Delete(&gusUser)
+	}
+
+	//Deleting 'saul' user created for testing rest of the APIs
 	TestDeleteMember(t)
 }

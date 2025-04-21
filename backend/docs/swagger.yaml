@@ -44,6 +44,14 @@ definitions:
         type: array
       email:
         type: string
+      followers:
+        items:
+          $ref: '#/definitions/models.Member'
+        type: array
+      following:
+        items:
+          $ref: '#/definitions/models.Member'
+        type: array
       liked_comments:
         items:
           $ref: '#/definitions/models.Comment'
@@ -616,6 +624,131 @@ paths:
           schema:
             type: string
       summary: Retrieves posts disliked by a specific user
+      tags:
+      - member
+  /member/{username}/follow:
+    delete:
+      consumes:
+      - application/json
+      description: Allows the logged-in user to unfollow another member by username.
+      parameters:
+      - description: Username of the member to unfollow
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Unfollowed successfully
+          schema:
+            type: string
+        "400":
+          description: Cannot unfollow yourself or bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+        "500":
+          description: Failed to unfollow
+          schema:
+            type: string
+      summary: Unfollow a member
+      tags:
+      - member
+    post:
+      consumes:
+      - application/json
+      description: Allows the logged-in user to follow another member by username.
+      parameters:
+      - description: Username of the member to follow
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Followed successfully
+          schema:
+            type: string
+        "400":
+          description: Cannot follow yourself or bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+        "500":
+          description: Failed to follow
+          schema:
+            type: string
+      summary: Follow a member
+      tags:
+      - member
+  /member/{username}/followers:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of members who follow the specified user.
+      parameters:
+      - description: Username of the member
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of followers
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Get a member's followers
+      tags:
+      - member
+  /member/{username}/following:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of members that the specified user is following.
+      parameters:
+      - description: Username of the member
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of following
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Get members a user is following
       tags:
       - member
   /member/{username}/liked-comments:
