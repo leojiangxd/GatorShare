@@ -10,8 +10,17 @@ definitions:
         type: string
       createdAt:
         type: string
+      disliked_comments:
+        items:
+          $ref: '#/definitions/models.Member'
+        type: array
       dislikes:
         type: integer
+      liked_comments:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.Member'
+        type: array
       likes:
         type: integer
       post_id:
@@ -25,12 +34,20 @@ definitions:
         type: string
       csrf_token:
         type: string
+      disliked_comments:
+        items:
+          $ref: '#/definitions/models.Comment'
+        type: array
       disliked_posts:
         items:
           $ref: '#/definitions/models.Post'
         type: array
       email:
         type: string
+      liked_comments:
+        items:
+          $ref: '#/definitions/models.Comment'
+        type: array
       liked_posts:
         description: Relationships
         items:
@@ -41,6 +58,21 @@ definitions:
       session_token:
         type: string
       updatedAt:
+        type: string
+      username:
+        type: string
+    type: object
+  models.Notification:
+    properties:
+      content:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      read:
+        type: boolean
+      title:
         type: string
       username:
         type: string
@@ -278,6 +310,42 @@ paths:
       summary: Updates an existing comment
       tags:
       - comment
+  /comment/{postId}/{commentId}/like-dislike:
+    put:
+      consumes:
+      - application/json
+      description: This API allows a logged-in user to like or dislike a specific
+        comment. The action is specified in the request body as either "like" or "dislike".
+      parameters:
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Action applied successfully with updated like/dislike counts
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid action
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Like or dislike action on a comment
+      tags:
+      - comment
   /current-user:
     get:
       consumes:
@@ -482,6 +550,42 @@ paths:
       summary: Gets a member's info by their username
       tags:
       - member
+  /member/{username}/disliked-comments:
+    get:
+      consumes:
+      - application/json
+      description: This API fetches all comments that have been disliked by a specific
+        user, identified by their username.
+      parameters:
+      - description: Username of the member
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Comment'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Retrieves comments disliked by a specific user
+      tags:
+      - member
   /member/{username}/disliked-posts:
     get:
       consumes:
@@ -512,6 +616,42 @@ paths:
           schema:
             type: string
       summary: Retrieves posts disliked by a specific user
+      tags:
+      - member
+  /member/{username}/liked-comments:
+    get:
+      consumes:
+      - application/json
+      description: This API fetches all comments that have been liked by a specific
+        user, identified by their username.
+      parameters:
+      - description: Username of the member
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Comment'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Retrieves comments liked by a specific user
       tags:
       - member
   /member/{username}/liked-posts:
@@ -574,6 +714,173 @@ paths:
       summary: Retrieves posts by a specific user
       tags:
       - post
+  /notification:
+    get:
+      consumes:
+      - application/json
+      description: Fetches a slice of notifications for the logged-in user. Supports
+        optional query parameters for sorting, limit, and offset.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notifications list and count
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Gets notifications for the current user
+      tags:
+      - notification
+    post:
+      consumes:
+      - application/json
+      description: Sends a notification with a title and content to a specified user.
+      parameters:
+      - description: Notification data
+        in: body
+        name: notification
+        required: true
+        schema:
+          $ref: '#/definitions/models.Notification'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Notification sent
+          schema:
+            type: string
+        "400":
+          description: Notification title, content, and username (recipient) required
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Sends a notification to a user
+      tags:
+      - notification
+    put:
+      consumes:
+      - application/json
+      description: Sets all notifications for the logged-in user to read/unread.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notifications updated successfully
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Bulk update notifications' read status
+      tags:
+      - notification
+  /notification/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a notification by its unique ID. Only the recipient can
+        delete their own notifications.
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification deleted successfully
+          schema:
+            type: string
+        "400":
+          description: Notification not found or not owned by user
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Deletes a notification
+      tags:
+      - notification
+    get:
+      consumes:
+      - application/json
+      description: Fetches a single notification by its unique ID.
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Notification'
+        "400":
+          description: No Records Found
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Gets a notification by its ID
+      tags:
+      - notification
+    put:
+      consumes:
+      - application/json
+      description: Updates the read status of a notification by its unique ID. Only
+        the recipient can update their own notifications.
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification updated successfully
+          schema:
+            type: string
+        "400":
+          description: You can only update your own notifications
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Notification not found
+          schema:
+            type: string
+      summary: Updates a notification's read status
+      tags:
+      - notification
   /post:
     get:
       consumes:

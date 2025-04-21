@@ -73,7 +73,17 @@ func SetUpRouter() *gin.Engine {
 		v1.GET("comment/:postId/", getComments)
 		v1.GET("comment/:postId/:commentId", getCommentById)
 		v1.POST("comment/:postId", createComment)
+		v1.PUT("comment/:postId/:commentId", updateComment)
 		v1.DELETE("comment/:postId/:commentId", deleteComment)
+		v1.PUT("comment/:postId/:commentId/like-dislike", likeOrDislikeComment)
+
+		// notification routes
+		v1.GET("notification", getNotifications)
+		v1.GET("notification/:id", getNotificationById)
+		v1.POST("notification", sendNotification)
+		v1.DELETE("notification/:id", deleteNotification)
+		v1.PUT("notification/:id", updateNotification)
+		v1.PUT("notification", updateNotifications)
 
 	}
 	return r
@@ -643,6 +653,438 @@ func TestDislikePost(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "Action applied successfully")
+}
+
+func TestGetComments(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	newPost := models.Post{
+		Title:   "Test Post",
+		Content: "To test getComments functionality",
+	}
+	jsonPost, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonPost))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var postResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &postResp)
+	postID := postResp["data"].(map[string]interface{})["post_id"].(string)
+
+	// Add a comment
+	newComment := models.Comment{
+		Content: "To test getComments functionality",
+	}
+	jsonComment, _ := json.Marshal(newComment)
+	req, _ = http.NewRequest("POST", "/api/v1/comment/"+postID, bytes.NewBuffer(jsonComment))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Test getComments
+	req, _ = http.NewRequest("GET", "/api/v1/comment/"+postID+"/", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+}
+
+func TestGetCommentById(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	newPost := models.Post{
+		Title:   "Test Post",
+		Content: "To test getCommentById functionality",
+	}
+	jsonPost, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonPost))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var postResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &postResp)
+	postID := postResp["data"].(map[string]interface{})["post_id"].(string)
+
+	newComment := models.Comment{
+		Content: "To test getCommentById functionality",
+	}
+	jsonComment, _ := json.Marshal(newComment)
+	req, _ = http.NewRequest("POST", "/api/v1/comment/"+postID, bytes.NewBuffer(jsonComment))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var commentResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &commentResp)
+	commentID := commentResp["data"].(map[string]interface{})["comment_id"].(string)
+
+	req, _ = http.NewRequest("GET", "/api/v1/comment/"+postID+"/"+commentID, nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+}
+
+func TestCreateComment(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Create post
+	newPost := models.Post{
+		Title:   "Test Post",
+		Content: "To test createComment functionality",
+	}
+	jsonPost, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonPost))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var postResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &postResp)
+	postID := postResp["data"].(map[string]interface{})["post_id"].(string)
+
+	newComment := models.Comment{
+		Content: "To test createComment functionality",
+	}
+	jsonComment, _ := json.Marshal(newComment)
+	req, _ = http.NewRequest("POST", "/api/v1/comment/"+postID, bytes.NewBuffer(jsonComment))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Comment created successfully")
+}
+
+func TestUpdateComment(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Create post and comment
+	newPost := models.Post{
+		Title:   "Test Post",
+		Content: "To test updateComment functionality",
+	}
+	jsonPost, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonPost))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var postResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &postResp)
+	postID := postResp["data"].(map[string]interface{})["post_id"].(string)
+
+	newComment := models.Comment{
+		Content: "To be updated",
+	}
+	jsonComment, _ := json.Marshal(newComment)
+	req, _ = http.NewRequest("POST", "/api/v1/comment/"+postID, bytes.NewBuffer(jsonComment))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var commentResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &commentResp)
+	commentID := commentResp["data"].(map[string]interface{})["comment_id"].(string)
+
+	// Update comment
+	updateReq := map[string]string{"content": "To test updateComment functionality"}
+	jsonUpdate, _ := json.Marshal(updateReq)
+	req, _ = http.NewRequest("PUT", "/api/v1/comment/"+postID+"/"+commentID, bytes.NewBuffer(jsonUpdate))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Comment updated successfully")
+}
+
+func TestDeleteComment(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Create post and comment
+	newPost := models.Post{
+		Title:   "Test Post",
+		Content: "To test deleteComment functionality",
+	}
+	jsonPost, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonPost))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var postResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &postResp)
+	postID := postResp["data"].(map[string]interface{})["post_id"].(string)
+
+	newComment := models.Comment{
+		Content: "To be deleted",
+	}
+	jsonComment, _ := json.Marshal(newComment)
+	req, _ = http.NewRequest("POST", "/api/v1/comment/"+postID, bytes.NewBuffer(jsonComment))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var commentResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &commentResp)
+	commentID := commentResp["data"].(map[string]interface{})["comment_id"].(string)
+
+	// Delete comment
+	req, _ = http.NewRequest("DELETE", "/api/v1/comment/"+postID+"/"+commentID, nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Comment deleted successfully")
+}
+
+func TestLikeOrDislikeComment(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Create post and comment
+	newPost := models.Post{
+		Title:   "Test Post",
+		Content: "To test LikeOrDislikeComment functionality",
+	}
+	jsonPost, _ := json.Marshal(newPost)
+	req, _ := http.NewRequest("POST", "/api/v1/post", bytes.NewBuffer(jsonPost))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var postResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &postResp)
+	postID := postResp["data"].(map[string]interface{})["post_id"].(string)
+
+	newComment := models.Comment{Content: "To test LikeOrDislikeComment functionality"}
+	jsonComment, _ := json.Marshal(newComment)
+	req, _ = http.NewRequest("POST", "/api/v1/comment/"+postID, bytes.NewBuffer(jsonComment))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var commentResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &commentResp)
+	commentID := commentResp["data"].(map[string]interface{})["comment_id"].(string)
+
+	// Like the comment
+	likeReq := map[string]string{"action": "like"}
+	jsonLike, _ := json.Marshal(likeReq)
+	req, _ = http.NewRequest("PUT", "/api/v1/comment/"+postID+"/"+commentID+"/like-dislike", bytes.NewBuffer(jsonLike))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Action applied successfully")
+
+	// Dislike the comment
+	dislikeReq := map[string]string{"action": "dislike"}
+	jsonDislike, _ := json.Marshal(dislikeReq)
+	req, _ = http.NewRequest("PUT", "/api/v1/comment/"+postID+"/"+commentID+"/like-dislike", bytes.NewBuffer(jsonDislike))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Action applied successfully")
+}
+
+func TestSendNotification(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	noti := models.Notification{
+		Title:    "Test Notification",
+		Content:  "To test sendNotification functionality",
+		Username: "saul",
+	}
+	jsonNoti, _ := json.Marshal(noti)
+	req, _ := http.NewRequest("POST", "/api/v1/notification", bytes.NewBuffer(jsonNoti))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Contains(t, w.Body.String(), "Notification sent")
+}
+
+func TestGetNotifications(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	req, _ := http.NewRequest("GET", "/api/v1/notification?column=created_at&order=desc&limit=10&offset=0", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+	assert.Contains(t, w.Body.String(), "count")
+}
+
+func TestGetNotificationById(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Send a notification first
+	noti := models.Notification{
+		Title:    "Test Notification",
+		Content:  "To test getNotificationById functionality",
+		Username: "saul",
+	}
+	jsonNoti, _ := json.Marshal(noti)
+	req, _ := http.NewRequest("POST", "/api/v1/notification", bytes.NewBuffer(jsonNoti))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	// Get notification id
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	// Fetch notification list to get ID
+	req, _ = http.NewRequest("GET", "/api/v1/notification", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var listResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &listResp)
+	notis := listResp["data"].([]interface{})
+	notiID := notis[0].(map[string]interface{})["id"].(string)
+	// Now get by id
+	req, _ = http.NewRequest("GET", "/api/v1/notification/"+notiID, nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "data")
+}
+
+func TestUpdateNotification(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Send a notification
+	noti := models.Notification{
+		Title:    "Test Notification",
+		Content:  "To test updateNotification functionality",
+		Username: "saul",
+	}
+	jsonNoti, _ := json.Marshal(noti)
+	req, _ := http.NewRequest("POST", "/api/v1/notification", bytes.NewBuffer(jsonNoti))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	// Get notification id
+	req, _ = http.NewRequest("GET", "/api/v1/notification", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var listResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &listResp)
+	notis := listResp["data"].([]interface{})
+	notiID := notis[0].(map[string]interface{})["id"].(string)
+	// Update notification
+	updateReq := map[string]bool{"read": true}
+	jsonUpdate, _ := json.Marshal(updateReq)
+	req, _ = http.NewRequest("PUT", "/api/v1/notification/"+notiID, bytes.NewBuffer(jsonUpdate))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Notification updated successfully")
+}
+
+func TestUpdateNotifications(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Send a notification
+	noti := models.Notification{
+		Title:    "Test Notification",
+		Content:  "To test updateNotifications functionality",
+		Username: "saul",
+	}
+	jsonNoti, _ := json.Marshal(noti)
+	req, _ := http.NewRequest("POST", "/api/v1/notification", bytes.NewBuffer(jsonNoti))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	// Bulk update
+	updateReq := map[string]bool{"read": true}
+	jsonUpdate, _ := json.Marshal(updateReq)
+	req, _ = http.NewRequest("PUT", "/api/v1/notification", bytes.NewBuffer(jsonUpdate))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Notifications updated successfully")
+}
+
+func TestDeleteNotification(t *testing.T) {
+	err := connectDatabase()
+	checkErr(err)
+	r := SetUpRouter()
+
+	// Send a notification
+	noti := models.Notification{
+		Title:    "Test Notification",
+		Content:  "To test deleteNotification functionality",
+		Username: "saul",
+	}
+	jsonNoti, _ := json.Marshal(noti)
+	req, _ := http.NewRequest("POST", "/api/v1/notification", bytes.NewBuffer(jsonNoti))
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	// Get notification id
+	req, _ = http.NewRequest("GET", "/api/v1/notification", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var listResp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &listResp)
+	notis := listResp["data"].([]interface{})
+	notiID := notis[0].(map[string]interface{})["id"].(string)
+	// Delete notification
+	req, _ = http.NewRequest("DELETE", "/api/v1/notification/"+notiID, nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: testSessionToken})
+	req.Header.Add("X-CSRF-Token", testCSRFToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Notification deleted successfully")
 
 	//Deleting user created for testing APIs
 	TestDeleteMember(t)
