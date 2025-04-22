@@ -11,8 +11,6 @@ Completed:
 
 Incomplete:
 - Messaging system
-- Follower system
-
 
 ### Backend
 Completed:
@@ -171,3 +169,4 @@ Incomplete:
 - PDF version of the swagger documentation in the github repo as api-documentation.pdf
 
 ## Sprint Video
+https://youtu.be/4minjXcBX1s
